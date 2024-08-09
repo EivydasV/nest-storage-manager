@@ -156,13 +156,13 @@ export class AppService {
     const filePath = 'path/to/file.jpg';
     const relativePath = await this.uploads.upload(filePath, {
       generateUniqueFileName: (fileExtension) => {
-        return `${fileExtension}-${Date.now()}`;
+        return `unique-file-name${fileExtension}`;
       },
       generateSubDirectories: (options) => { // you can also pass false instead of a function to disable the subdirectory generation
         return path.join('cool', 'dir');
       }, 
     });
-    console.log(relativePath); // uploads/cool/dir/08393b6b-ae49-43b5-a6b5-40b66d57a611.jpg
+    console.log(relativePath); // uploads/cool/dir/unique-file-name.jpg
   }
 }
 ```
