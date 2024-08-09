@@ -1,6 +1,6 @@
 {
 	"name": "nest-storage-manager",
-	"version": "0.0.4",
+	"version": "0.0.5",
 	"description": "Nestjs file manager for local storage",
 	"author": "EivydasV",
 	"main": "dist/index.js",
@@ -68,13 +68,19 @@
 		"typescript": "^5.1.3"
 	},
 	"jest": {
-		"moduleFileExtensions": ["js", "json", "ts"],
+		"moduleFileExtensions": [
+			"js",
+			"json",
+			"ts"
+		],
 		"rootDir": "src",
 		"testRegex": ".*\\.spec\\.ts$",
 		"transform": {
 			"^.+\\.(t|j)s$": "ts-jest"
 		},
-		"collectCoverageFrom": ["**/*.(t|j)s"],
+		"collectCoverageFrom": [
+			"**/*.(t|j)s"
+		],
 		"coverageDirectory": "../coverage",
 		"testEnvironment": "node"
 	}
