@@ -1,6 +1,6 @@
 {
 	"name": "nest-storage-manager",
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"description": "Nestjs file manager for local storage",
 	"author": "EivydasV",
 	"main": "dist/index.js",
@@ -33,11 +33,13 @@
 		"test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
 		"test:e2e": "jest --config ./test/jest-e2e.json"
 	},
+	"dependencies": {
+		"file-type": "^19.3.0"
+	},
 	"devDependencies": {
 		"@nestjs/common": "^10.0.0",
 		"@nestjs/core": "^10.0.0",
 		"@nestjs/platform-express": "^10.0.0",
-		"file-type": "^19.3.0",
 		"reflect-metadata": "^0.2.0",
 		"rxjs": "^7.8.1",
 		"@biomejs/biome": "1.8.3",
