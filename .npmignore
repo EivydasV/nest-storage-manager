@@ -6,6 +6,11 @@ package-lock.json
 tslint.json
 tsconfig.json
 biome.json
+.idea/
+test
+tsconfig.json
+tsconfig.build.json
+nest-cli.json
 
 # github
 .github
