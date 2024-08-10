@@ -1,2 +1,2 @@
 export * from './local-storage.interface';
-export * from './uploader-module-options.interface';
+export * from './storage-module-options.interface';

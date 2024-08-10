@@ -1,12 +1,9 @@
 import * as fs from 'node:fs';
 import { StatOptions } from 'node:fs';
-import * as fsPromises from 'node:fs/promises';
 import * as path from 'node:path';
-import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { FileManagerError } from '../error/file-manager.error';
-import { InvalidPathError } from '../error/invalid-path.error';
-import { FsHelper } from '../helper/fs.helper';
+import { FileManagerError, InvalidPathError } from '../error';
+import { FsHelper } from '../helper';
 import {
 	GetFileStatsReturnInterface,
 	GetFileStreamOptions,
@@ -14,8 +11,8 @@ import {
 	GetFilesCursorOptions,
 	LocalStorageOptionsInterface,
 	UploadFileOptionsInterface,
-} from '../interface/local-storage.interface';
-import { FileType } from '../type/file.type';
+} from '../interface';
+import { FileType } from '../type';
 import { AbstractStorage } from './abstract.storage';
 
 export class LocalStorage extends AbstractStorage {
@@ -84,8 +81,8 @@ export class LocalStorage extends AbstractStorage {
 	 * @throws FileDoesNotExistError
 	 * @throws FileManagerError
 	 */
-	public async delete(filePath: string): Promise<boolean> {
-		const safePath = this.getSafePath(filePath);
+	public async delete(relativePath: string): Promise<boolean> {
+		const safePath = this.getSafePath(relativePath);
 
 		await this.fsHelper.checkIfFileExists(safePath);
 
@@ -149,8 +146,8 @@ export class LocalStorage extends AbstractStorage {
 	/**
 	 * @throws InvalidPathError
 	 */
-	public async doesFileExist(filePath: string): Promise<boolean> {
-		const safePath = this.getSafePath(filePath);
+	public async doesFileExist(relativePath: string): Promise<boolean> {
+		const safePath = this.getSafePath(relativePath);
 
 		return this.fsHelper
 			.checkIfFileExists(safePath)
@@ -165,12 +162,12 @@ export class LocalStorage extends AbstractStorage {
 	 * @throws FileTypeError
 	 */
 	public async getFileStats(
-		fileRelativePath: string,
+		relativePath: string,
 		options?: StatOptions & {
 			bigint?: false | undefined;
 		},
 	): Promise<GetFileStatsReturnInterface> {
-		const safePath = this.getSafePath(fileRelativePath);
+		const safePath = this.getSafePath(relativePath);
 
 		await this.fsHelper.checkIfFileExists(safePath);
 
@@ -184,10 +181,10 @@ export class LocalStorage extends AbstractStorage {
 	 * @throws FileTypeError
 	 */
 	public async getFileStream(
-		fileRelativePath: string,
+		relativePath: string,
 		options?: GetFileStreamOptions,
 	): Promise<GetFileStreamReturnInterface> {
-		const safePath = this.getSafePath(fileRelativePath);
+		const safePath = this.getSafePath(relativePath);
 		await this.fsHelper.checkIfFileExists(safePath);
 
 		const fileWithType = await this.internalGetFileStats(safePath);

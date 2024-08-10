@@ -42,8 +42,6 @@ import { StorageEnum, StorageModule } from 'nest-storage-manager';
     },
   ])
   ],
-  controllers: [AppController],
-  providers: [AppService],
 })
 export class AppModule {}
 ```
@@ -70,13 +68,46 @@ import { StorageEnum, StorageModule } from 'nest-storage-manager';
         path: 'temp',
       },
     },
-  ])
+    ])
   ],
-  controllers: [AppController],
-  providers: [AppService],
 })
 export class AppModule {}
 ```
+or using `registerAsync` method
+```ts
+import { StorageEnum, StorageModule } from 'nest-storage-manager';
+
+@Module({
+  imports: [StorageModule.registerAsync({
+    storages: [
+      {
+        name: 'temp',
+        useFactory: () => {
+          return {
+            storage: StorageEnum.LOCAL,
+            options: {
+              path: 'storage',
+            },
+          };
+        },
+      },
+      {
+        name: 'storage',
+        useFactory: () => {
+          return {
+            storage: StorageEnum.LOCAL,
+            options: {
+              path: 'storage',
+            },
+          };
+        },
+      },
+    ],
+  })],
+})
+export class AppModule {}
+```
+
 just make sure that the names are unique.
 
 When only array passed to register method, the storages will be registered only for that module and will not be available globally. If you want to make the storages available globally, you can pass an object with the `isGlobal` property set to true.

@@ -15,7 +15,7 @@ import {
 	GetFilesCursorOptions,
 	UploadFileOptionsInterface,
 } from '../interface';
-import { StorageProviders } from '../interface';
+import { StorageProvidersType } from '../interface';
 import { FileType } from '../type';
 import { importESM } from '../util/import-esm-module';
 import { isValidURL } from '../util/is-valid-url';
@@ -33,7 +33,7 @@ export abstract class AbstractStorage {
 		perPage: 10,
 	};
 
-	protected constructor(private readonly uploadOptions: StorageProviders) {}
+	protected constructor(private readonly uploadOptions: StorageProvidersType) {}
 
 	/**
 	 *	Uploads a file to the storage.
@@ -62,7 +62,7 @@ export abstract class AbstractStorage {
 	 * Deletes a file from the storage.
 	 * Returns `true` if the file was deleted successfully, otherwise `false`.
 	 */
-	protected abstract delete(relativeFilePath: string): Promise<boolean>;
+	protected abstract delete(relativePath: string): Promise<boolean>;
 
 	/**
 	 * Deletes multiple files from the storage.
@@ -70,10 +70,10 @@ export abstract class AbstractStorage {
 	 *  @example Promise.allSettled(this.storage.delete(relativeFilePath), this.storage.delete(relativeFilePath))
 	 */
 	public async deleteMany(
-		relativeFilePaths: string[],
+		relativePaths: string[],
 	): Promise<PromiseSettledResult<boolean>[]> {
-		const promises = relativeFilePaths.map((relativeFilePath) =>
-			this.delete(relativeFilePath),
+		const promises = relativePaths.map((relativePath) =>
+			this.delete(relativePath),
 		);
 
 		return Promise.allSettled(promises);
@@ -83,7 +83,7 @@ export abstract class AbstractStorage {
 	 * Checks if a file exists in the storage.
 	 * Returns `true` if the file exists, otherwise `false`.
 	 */
-	protected abstract doesFileExist(relativeFilePath: string): Promise<boolean>;
+	protected abstract doesFileExist(relativePath: string): Promise<boolean>;
 
 	/**
 	 *  Checks if multiple files exist in the storage.
@@ -92,10 +92,10 @@ export abstract class AbstractStorage {
 	 */
 
 	public async doesFileExistMany(
-		relativeFilePaths: string[],
+		relativePaths: string[],
 	): Promise<PromiseSettledResult<boolean>[]> {
-		const promises = relativeFilePaths.map((relativeFilePath) =>
-			this.doesFileExist(relativeFilePath),
+		const promises = relativePaths.map((relativePath) =>
+			this.doesFileExist(relativePath),
 		);
 
 		return Promise.allSettled(promises);
@@ -165,7 +165,7 @@ export abstract class AbstractStorage {
 	}
 
 	protected abstract getFileStream(
-		fileRelativePath: string,
+		relativePath: string,
 	): Promise<GetFileStreamReturnInterface>;
 
 	protected generateFullPath(
