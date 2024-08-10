@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import { Readable } from 'node:stream';
 import { MimeType } from 'file-type/core';
 import { StorageEnum } from '../enum';
-import { BaseStorageOptionsInterface } from './uploader-module-options.interface';
+import { BaseStorageOptionsInterface } from './storage-module-options.interface';
 
 /**
  * Interface for configuring local storage options.
