@@ -1,41 +1,43 @@
 import * as fs from 'node:fs';
-import { StatOptions } from 'node:fs';
 import * as path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { FileManagerError, InvalidPathError } from '../error';
 import { FsHelper } from '../helper';
 import {
-	GetFileStatsReturnInterface,
-	GetFileStreamOptions,
-	GetFileStreamReturnInterface,
-	GetFilesCursorOptions,
-	LocalStorageOptionsInterface,
-	UploadFileOptionsInterface,
+	CopyOrMoveInputInterface,
+	GetFileStatsLocalOptionsType,
+	GetFileStatsLocalReturnInterface,
+	GetFileStreamLocalOptionsInterface,
+	GetFileStreamLocalReturnInterface,
+	GetFilesCursorLocalOptions,
+	GetFilesCursorLocalReturnType,
+	MoveReturnType,
+	StorageLocalOptionsType,
+	StorageOptionsLocalInterface,
+	UploadFileLocalOptionsInterface,
 } from '../interface';
 import { FileType } from '../type';
 import { AbstractStorage } from './abstract.storage';
 
 export class LocalStorage extends AbstractStorage {
-	private static localStorageDefaultOptions: LocalStorageOptionsInterface['options'] =
-		{
-			rootPath: process.cwd(),
-			path: '',
-		};
-
-	private readonly localStorageOptions: LocalStorageOptionsInterface['options'];
+	private static localStorageDefaultOptions: Required<
+		Pick<StorageOptionsLocalInterface['options'], 'rootPath'>
+	> = {
+		rootPath: process.cwd(),
+	};
 
 	constructor(
-		localStorageAllOptions: LocalStorageOptionsInterface,
+		private readonly localStorageOptions: StorageOptionsLocalInterface,
 		private readonly fsHelper: FsHelper,
 	) {
-		localStorageAllOptions.options = {
+		super(localStorageOptions);
+	}
+
+	public get options(): StorageLocalOptionsType {
+		return {
 			...LocalStorage.localStorageDefaultOptions,
-			...localStorageAllOptions.options,
+			...this.localStorageOptions.options,
 		};
-
-		super(localStorageAllOptions);
-
-		this.localStorageOptions = localStorageAllOptions.options;
 	}
 
 	/**
@@ -43,18 +45,27 @@ export class LocalStorage extends AbstractStorage {
 	 * @throws FileDoesNotExistError
 	 * @throws FileManagerError
 	 */
-	public async copy(
-		fromRelativePath: string,
-		toRelativePath: string,
-	): Promise<string> {
-		const from = this.getSafePath(fromRelativePath);
-		const to = this.getSafePath(toRelativePath);
+	public async copy({ to, from }: CopyOrMoveInputInterface): Promise<string> {
+		const safeFrom = this.getSafePath(from);
+		const safeTo = this.getSafePath(to);
+		await this.fsHelper.checkIfFileExists(safeFrom);
 
-		await this.fsHelper.checkIfFileExists(from);
+		await this.fsHelper.copy(safeFrom, safeTo);
 
-		await this.fsHelper.copy(from, to);
+		return safeTo;
+	}
 
-		return toRelativePath;
+	/**
+	 * @param {CopyOrMoveInputInterface} inputs
+	 *
+	 * @return {Promise<PromiseSettledResult<string>[]>}
+	 */
+	public async copyMany(
+		inputs: CopyOrMoveInputInterface[],
+	): Promise<PromiseSettledResult<string>[]> {
+		const promises = inputs.map((input) => this.copy(input));
+
+		return Promise.allSettled(promises);
 	}
 
 	/**
@@ -62,18 +73,23 @@ export class LocalStorage extends AbstractStorage {
 	 * @throws FileDoesNotExistError
 	 * @throws FileManagerError
 	 */
-	public async move(
-		fromRelativePath: string,
-		toRelativePath: string,
-	): Promise<string> {
-		const from = this.getSafePath(fromRelativePath);
-		const to = this.getSafePath(toRelativePath);
+	public async move({ to, from }: CopyOrMoveInputInterface): Promise<string> {
+		const safeFrom = this.getSafePath(from);
+		const safeTo = this.getSafePath(to);
 
-		await this.fsHelper.checkIfFileExists(from);
+		await this.fsHelper.checkIfFileExists(safeFrom);
 
-		await this.fsHelper.move(from, to);
+		await this.fsHelper.move(safeFrom, safeTo);
 
-		return toRelativePath;
+		return safeTo;
+	}
+
+	public async moveMany(
+		inputs: CopyOrMoveInputInterface[],
+	): Promise<PromiseSettledResult<MoveReturnType>[]> {
+		const promises = inputs.map((input) => this.move(input));
+
+		return Promise.allSettled(promises);
 	}
 
 	/**
@@ -91,6 +107,16 @@ export class LocalStorage extends AbstractStorage {
 		return true;
 	}
 
+	public async deleteMany(
+		relativePaths: string[],
+	): Promise<PromiseSettledResult<boolean>[]> {
+		const promises = relativePaths.map((relativePath) =>
+			this.delete(relativePath),
+		);
+
+		return Promise.allSettled(promises);
+	}
+
 	/**
 	 * @throws FileManagerError
 	 * @throws FileTypeError
@@ -98,14 +124,23 @@ export class LocalStorage extends AbstractStorage {
 	 */
 	public async upload(
 		file: FileType,
-		uploadOptions: UploadFileOptionsInterface = {},
+		options?: UploadFileLocalOptionsInterface,
 	): Promise<string> {
-		const { _file, _fileName, _options } = await this.getUploadParameters(
-			file,
-			uploadOptions,
-		);
+		const uploadOptions = {
+			...AbstractStorage.defaultUploadOptions,
+			...options,
+		};
 
-		return this.writeToDisk(_file, _fileName, _options);
+		return this.writeToDisk(file, uploadOptions);
+	}
+
+	public async uploadMany(
+		files: FileType[],
+		options?: UploadFileLocalOptionsInterface,
+	): Promise<PromiseSettledResult<string>[]> {
+		const promises = files.map((file) => this.upload(file, options));
+
+		return Promise.allSettled(promises);
 	}
 
 	/**
@@ -113,8 +148,8 @@ export class LocalStorage extends AbstractStorage {
 	 * @throws FileTypeError
 	 */
 	public async *getFilesCursor(
-		options?: GetFilesCursorOptions,
-	): AsyncGenerator<GetFileStatsReturnInterface[], void, unknown> {
+		options?: GetFilesCursorLocalOptions,
+	): GetFilesCursorLocalReturnType {
 		const { perPage, ...mergeOptions } = {
 			...AbstractStorage.defaultGetFilesCursorOptions,
 			...options,
@@ -149,10 +184,23 @@ export class LocalStorage extends AbstractStorage {
 	public async doesFileExist(relativePath: string): Promise<boolean> {
 		const safePath = this.getSafePath(relativePath);
 
-		return this.fsHelper
-			.checkIfFileExists(safePath)
-			.then(() => true)
-			.catch(() => false);
+		try {
+			await this.fsHelper.checkIfFileExists(safePath);
+
+			return true;
+		} catch (err) {
+			return false;
+		}
+	}
+
+	public async doesFileExistMany(
+		relativePaths: string[],
+	): Promise<PromiseSettledResult<boolean>[]> {
+		const promises = relativePaths.map((relativePath) =>
+			this.doesFileExist(relativePath),
+		);
+
+		return Promise.allSettled(promises);
 	}
 
 	/**
@@ -163,10 +211,8 @@ export class LocalStorage extends AbstractStorage {
 	 */
 	public async getFileStats(
 		relativePath: string,
-		options?: StatOptions & {
-			bigint?: false | undefined;
-		},
-	): Promise<GetFileStatsReturnInterface> {
+		options?: GetFileStatsLocalOptionsType,
+	): Promise<GetFileStatsLocalReturnInterface> {
 		const safePath = this.getSafePath(relativePath);
 
 		await this.fsHelper.checkIfFileExists(safePath);
@@ -182,8 +228,8 @@ export class LocalStorage extends AbstractStorage {
 	 */
 	public async getFileStream(
 		relativePath: string,
-		options?: GetFileStreamOptions,
-	): Promise<GetFileStreamReturnInterface> {
+		options?: GetFileStreamLocalOptionsInterface,
+	): Promise<GetFileStreamLocalReturnInterface> {
 		const safePath = this.getSafePath(relativePath);
 		await this.fsHelper.checkIfFileExists(safePath);
 
@@ -197,16 +243,14 @@ export class LocalStorage extends AbstractStorage {
 
 	private async writeToDisk(
 		file: FileType,
-		fileName: string,
-		options: UploadFileOptionsInterface,
+		options: UploadFileLocalOptionsInterface,
 	): Promise<string> {
-		const filePath = this.generateFullPath(fileName, options);
-		await this.fsHelper.makeDir(path.dirname(filePath), {
-			recursive: true,
-		});
+		const { file: fileFromType, fileName } = await this.getFile(file, options);
+
+		const filePath = await this.generateFullPath(fileName, options);
 
 		try {
-			return await this.writeSteam(file, filePath);
+			return await this.writeSteam(fileFromType, filePath);
 		} catch (err) {
 			if (options.deleteFileOnError) {
 				this.logger.debug(`deleting file: "${filePath}"`);
@@ -227,10 +271,10 @@ export class LocalStorage extends AbstractStorage {
 	}
 
 	private getSafePath(filePath: string): string {
-		const error = new InvalidPathError(filePath, this.localStorageOptions.path);
+		const error = new InvalidPathError(filePath, this.options.path);
 
 		const splitPath = filePath.split(path.sep);
-		if (this.localStorageOptions.path !== splitPath.shift()) {
+		if (this.options.path !== splitPath.shift()) {
 			throw error;
 		}
 
@@ -247,16 +291,13 @@ export class LocalStorage extends AbstractStorage {
 	}
 
 	private getRelativePath(absolutePath: string): string {
-		// biome-ignore lint/style/noNonNullAssertion: <explanation>
-		return path.relative(this.localStorageOptions.rootPath!, absolutePath);
+		return path.relative(this.options.rootPath, absolutePath);
 	}
 
 	private async internalGetFileStats(
 		absoluteFilePath: string,
-		options?: StatOptions & {
-			bigint?: false | undefined;
-		},
-	): Promise<GetFileStatsReturnInterface> {
+		options?: GetFileStatsLocalOptionsType,
+	): Promise<GetFileStatsLocalReturnInterface> {
 		const statPromise = this.fsHelper.stats(absoluteFilePath, options);
 		const fileWithFileTypePromise = this.getFileType(absoluteFilePath);
 
@@ -277,7 +318,7 @@ export class LocalStorage extends AbstractStorage {
 
 	private async processFileBatch(
 		files: fs.Dirent[],
-	): Promise<GetFileStatsReturnInterface[]> {
+	): Promise<GetFileStatsLocalReturnInterface[]> {
 		return Promise.all(
 			files.map(async (file) => {
 				const absolutePath = path.join(file.parentPath, file.name);
@@ -285,5 +326,26 @@ export class LocalStorage extends AbstractStorage {
 				return this.internalGetFileStats(absolutePath);
 			}),
 		);
+	}
+
+	private async generateFullPath(
+		fileName: string,
+		options: UploadFileLocalOptionsInterface,
+	): Promise<string> {
+		const genPath = path.join(
+			this.getStoragePath(),
+			this.generateSubDirectories(options),
+			fileName,
+		);
+
+		await this.fsHelper.makeDir(path.dirname(genPath), {
+			recursive: true,
+		});
+
+		return genPath;
+	}
+
+	private getStoragePath(): string {
+		return path.join(this.options.rootPath, this.options.path);
 	}
 }

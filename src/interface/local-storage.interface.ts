@@ -1,14 +1,28 @@
-import { OpenDirOptions, Stats } from 'node:fs';
 import * as fs from 'node:fs';
+import { OpenDirOptions, StatOptions, Stats } from 'node:fs';
 import { Readable } from 'node:stream';
 import { MimeType } from 'file-type/core';
 import { StorageEnum } from '../enum';
 import { BaseStorageOptionsInterface } from './storage-module-options.interface';
 
+export type StorageLocalOptionsType = Required<
+	StorageOptionsLocalInterface['options']
+>;
+
+export type GetFileStatsLocalOptionsType = StatOptions & {
+	bigint?: false | undefined;
+};
+
+export type GetFilesCursorLocalReturnType = AsyncGenerator<
+	GetFileStatsLocalReturnInterface[],
+	void,
+	unknown
+>;
+
 /**
  * Interface for configuring local storage options.
  */
-export interface LocalStorageOptionsInterface
+export interface StorageOptionsLocalInterface
 	extends BaseStorageOptionsInterface<StorageEnum.LOCAL> {
 	options: {
 		/**
@@ -28,7 +42,7 @@ export interface LocalStorageOptionsInterface
 /**
  * Interface for configuring file upload options.
  */
-export interface UploadFileOptionsInterface {
+export interface UploadFileLocalOptionsInterface {
 	/**
 	 * Determines whether to generate subdirectories for file storage.
 	 * When set to `true`, subdirectories will be generated to improve file search speed.
@@ -60,7 +74,7 @@ export interface UploadFileOptionsInterface {
 /**
  * Interface for configuring file upload options.
  */
-export interface GetFilesCursorOptions
+export interface GetFilesCursorLocalOptions
 	extends Omit<OpenDirOptions, 'recursive'> {
 	/**
 	 * The number of files to return per page.
@@ -72,7 +86,7 @@ export interface GetFilesCursorOptions
 /**
  * Interface for configuring the start and end positions of a file stream.
  */
-export interface GetFileStreamOptions {
+export interface GetFileStreamLocalOptionsInterface {
 	start?: number;
 	end?: number;
 	highWaterMark?: number;
@@ -87,7 +101,7 @@ export interface GetFileStreamOptions {
 /**
  * Interface for returning file stats.
  */
-export interface GetFileStatsReturnInterface {
+export interface GetFileStatsLocalReturnInterface {
 	/**
 	 * The file name. Example: `fileName.jpg`
 	 */
@@ -122,7 +136,7 @@ export interface GetFileStatsReturnInterface {
 /**
  * Interface for returning a readable stream of a file.
  */
-export interface GetFileStreamReturnInterface {
+export interface GetFileStreamLocalReturnInterface {
 	/**
 	 * The readable stream of the file.
 	 */

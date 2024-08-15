@@ -6,12 +6,12 @@
 <p align="center">Nestjs file manager</p>
 
 ## Description
- **nest-storage-manager** is helper for managing files. It provides a simple and easy way to upload, delete, and manage files. And it uses node streams under the hood to make it fast and efficient.
+ **nest-storage-manager** is a convenient utility for managing files, offering a straightforward and efficient way to upload, delete, and organize files. Leveraging Node.js streams under the hood, it ensures fast and reliable performance
 
 ## Features
  - Local storage
- - aws s3 - coming soon
- - protected from directory traversal attack
+ - AWS S3 storage
+ - Protected from directory traversal attack
 
 ## Installation
 
@@ -21,6 +21,19 @@ $ npm install --save nest-storage-manager
 or 
 ```bash
 $ yarn add nest-storage-manager
+```
+
+### When using AWS S3 storage
+
+You need to install the following packages
+
+
+```bash
+$ npm install --save @aws-sdk/lib-storage @aws-sdk/client-s3
+```
+or 
+```bash
+$ yarn add @aws-sdk/lib-storage @aws-sdk/client-s3
 ```
 
 ## Usage
@@ -61,11 +74,15 @@ import { StorageEnum, StorageModule } from 'nest-storage-manager';
       },
     },
     {
-      name: 'temp_uploads',
-      storage: StorageEnum.LOCAL, 
+      name: 's3',
+      storage: StorageEnum.AWS_S3,
       options: {
-        rootPath: process.cwd(),
-        path: 'temp',
+        credentials: {
+          accessKeyId: 'accessKeyId',
+          secretAccessKey: 'secretAccessKey',
+        },
+        region: 'us-east-1',
+        Bucket: 'nest-storage-manager',
       },
     },
     ])
@@ -148,6 +165,8 @@ export class AppService {
   ) {}
 }
 ```
+
+# Local storage
 
 ## Uploading files
 To upload a file, you can use the `upload` method of the storage. This method returns the relative path of the uploaded file. There is also `uploadMany` method which accepts an array of files and returns a promise that resolves to an array of relative paths.
@@ -316,7 +335,7 @@ export class AppService {
 response 
 ```ts
 {
-  fileName: '10f77d57-00cb-4215-9e89-0b1ce7d7feac.gz',
+    fileName: '10f77d57-00cb-4215-9e89-0b1ce7d7feac.gz',
     absolutePath: '/home/user/Desktop/coding/test-project/uploads/c/d/a/a/d/9/6/d/10f77d57-00cb-4215-9e89-0b1ce7d7feac.gz',
     relativePath: 'uploads/c/d/a/a/d/9/6/d/10f77d57-00cb-4215-9e89-0b1ce7d7feac.gz',
     mimeType: 'application/gzip',
@@ -425,6 +444,111 @@ export class AppService {
     if (!isSuccess) {
       throw new Error('Upload failed');
     } // ['uploads/c/c/3/d/8/d/c/6/08393b6b-ae49-43b5-a6b5-40b66d57a611.jpg', 'uploads/c/c/3/d/8/d/c/6/08393b6b-ae49-43b5-a6b5-40b66d57a612.jpg']
+  }
+}
+```
+
+## Options
+You can access passed options to the storage by using `options` property.
+
+```ts
+import { Injectable, Inject } from '@nestjs/common';
+import { LocalStorage } from 'nest-storage-manager';
+
+@Injectable()
+export class AppService {
+  constructor(
+    @Inject('uploads') private readonly uploads: LocalStorage,
+  ) {}
+
+  async moveFile() {
+    const options = await this.uploads.options;
+  }
+}
+```
+
+# AWS S3 storage
+
+When using AWS S3 it will have same methods as local storage but with some differences.
+Return types of methods are different from local storage.
+Also, options are different. Options are forwarded to aws s3 client.
+
+## Injecting the storage
+```ts
+import { AwsS3Storage } from 'nest-storage-manager';
+import { Injectable, Inject } from '@nestjs/common';
+
+
+@Injectable()
+export class AppService {
+  constructor(
+    @Inject('s3') private readonly s3Storage: AwsS3Storage,
+  ) {}
+}
+```
+
+## Uploading files
+To upload a file, you can use the `upload` method of the storage. Uploading to aws s3 would be a bit different from local storage.
+```ts
+import { Injectable, Inject } from '@nestjs/common';
+import { LocalStorage } from 'nest-storage-manager';
+
+@Injectable()
+export class AppService {
+  constructor(
+    @Inject('uploads') private readonly s3Storage: AwsS3Storage,
+  ) {}
+
+  async uploadFile() {
+    const filePath = 'path/to/file.jpg';
+    const upload = await this.s3Storage.upload(filePath);
+    const result = await upload.done()
+    }
+  }
+```
+Upload method returns `Upload` object from aws s3 client. You need to call `done` method on the upload object to wait for the upload to complete.
+`upload` method has few same options as local storage. That are `generateSubDirectories`, `generateUniqueFileName`, but it also has `cloud` options which will be forwarded to aws s3 client.
+
+## AWS S3 client
+
+You can access aws s3 client by using `client` property.
+
+```ts
+import { Injectable, Inject } from '@nestjs/common';
+import { LocalStorage } from 'nest-storage-manager';
+
+@Injectable()
+export class AppService {
+  constructor(
+    @Inject('uploads') private readonly s3Storage: AwsS3Storage,
+  ) {}
+
+  async test() {
+    const client = await this.s3Storage.client;
+  }
+}
+```
+This property exposes `S3Client` from `@aws-sdk/client-s3`. It could be usefully, when you want to implement custom method, that is not supported by `nest-storage-manager` or just want to access client directly.
+
+```ts
+import { Injectable, Inject } from '@nestjs/common';
+import { LocalStorage } from 'nest-storage-manager';
+import {
+  GetObjectCommand,
+} from '@aws-sdk/client-s3';
+
+@Injectable()
+export class AppService {
+  constructor(
+    @Inject('uploads') private readonly s3Storage: AwsS3Storage,
+  ) {}
+
+  async test() {
+    const client = this.awsS3Storage.client;
+
+    const res = await client.send(
+      new GetObjectCommand({ Bucket: 'test-bucket', Key: 'test.txt' }),
+    );
   }
 }
 ```

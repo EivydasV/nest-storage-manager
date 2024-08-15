@@ -5,17 +5,29 @@ import { Readable } from 'node:stream';
 import * as streamWeb from 'node:stream/web';
 import { Logger } from '@nestjs/common';
 import { FileTypeResult } from 'file-type';
-import { StorageEnum } from '../enum';
-import { FileDownloadError } from '../error';
-import { FileTypeError } from '../error';
+import { FileDownloadError, FileTypeError } from '../error';
 import {
-	GetFileStatsReturnInterface,
-	GetFileStreamOptions,
-	GetFileStreamReturnInterface,
+	CopyFileOptionsType,
+	CopyOrMoveInputInterface,
+	CopyReturnType,
+	DeleteFileOptionsType,
+	DeleteReturnType,
+	DoesFileExistOptionsType,
+	GetFileStatsOptionsType,
+	GetFileStatsReturnType,
+	GetFileStreamLocalOptionsInterface,
+	GetFileStreamOptionsType,
+	GetFileStreamReturnType,
 	GetFilesCursorOptions,
-	UploadFileOptionsInterface,
+	GetFilesCursorReturnType,
+	GetOptionsType,
+	MoveFileOptionsType,
+	MoveReturnType,
+	StorageProvidersType,
+	UploadFileLocalOptionsInterface,
+	UploadFileOptionsType,
+	UploadReturnType,
 } from '../interface';
-import { StorageProvidersType } from '../interface';
 import { FileType } from '../type';
 import { importESM } from '../util/import-esm-module';
 import { isValidURL } from '../util/is-valid-url';
@@ -23,7 +35,7 @@ import { isValidURL } from '../util/is-valid-url';
 export abstract class AbstractStorage {
 	protected readonly logger = new Logger(AbstractStorage.name);
 
-	protected static defaultUploadOptions: UploadFileOptionsInterface = {
+	protected static defaultUploadOptions: UploadFileLocalOptionsInterface = {
 		generateSubDirectories: true,
 		generateUniqueFileName: true,
 		deleteFileOnError: true,
@@ -36,54 +48,55 @@ export abstract class AbstractStorage {
 	protected constructor(private readonly uploadOptions: StorageProvidersType) {}
 
 	/**
-	 *	Uploads a file to the storage.
-	 *	Returns the relative path of the uploaded file.
+	 * Returns options which were passed to `register` or `registerAsync` method.
 	 */
-	protected abstract upload(
+	public abstract get options(): GetOptionsType;
+
+	/**
+	 * Uploads a file to the storage.
+	 */
+	public abstract upload(
 		file: FileType,
-		options?: UploadFileOptionsInterface,
-	): Promise<string>;
+		options?: UploadFileOptionsType,
+	): Promise<UploadReturnType>;
 
 	/**
 	 * Uploads multiple files to the storage.
 	 * Equivalent to
 	 * @example Promise.allSettled(this.storage.upload(file), this.storage.upload(file))
 	 */
-	public async uploadMany(
+	public abstract uploadMany(
 		files: FileType[],
-		options?: UploadFileOptionsInterface,
-	): Promise<PromiseSettledResult<string>[]> {
-		const promises = files.map((file) => this.upload(file, options));
-
-		return Promise.allSettled(promises);
-	}
+		options?: UploadFileLocalOptionsInterface,
+	): Promise<PromiseSettledResult<UploadReturnType>[]>;
 
 	/**
 	 * Deletes a file from the storage.
 	 * Returns `true` if the file was deleted successfully, otherwise `false`.
 	 */
-	protected abstract delete(relativePath: string): Promise<boolean>;
+	public abstract delete(
+		path: string,
+		options?: DeleteFileOptionsType,
+	): Promise<DeleteReturnType>;
 
 	/**
 	 * Deletes multiple files from the storage.
 	 *  Equivalent to
 	 *  @example Promise.allSettled(this.storage.delete(relativeFilePath), this.storage.delete(relativeFilePath))
 	 */
-	public async deleteMany(
-		relativePaths: string[],
-	): Promise<PromiseSettledResult<boolean>[]> {
-		const promises = relativePaths.map((relativePath) =>
-			this.delete(relativePath),
-		);
-
-		return Promise.allSettled(promises);
-	}
+	public abstract deleteMany(
+		paths: string[],
+		options?: DeleteFileOptionsType,
+	): Promise<PromiseSettledResult<DeleteReturnType>[]>;
 
 	/**
 	 * Checks if a file exists in the storage.
 	 * Returns `true` if the file exists, otherwise `false`.
 	 */
-	protected abstract doesFileExist(relativePath: string): Promise<boolean>;
+	public abstract doesFileExist(
+		path: string,
+		options?: DoesFileExistOptionsType,
+	): Promise<boolean>;
 
 	/**
 	 *  Checks if multiple files exist in the storage.
@@ -91,109 +104,79 @@ export abstract class AbstractStorage {
 	 *  @example Promise.allSettled(this.storage.doesFileExist(relativeFilePath), this.storage.doesFileExist(relativeFilePath))
 	 */
 
-	public async doesFileExistMany(
-		relativePaths: string[],
-	): Promise<PromiseSettledResult<boolean>[]> {
-		const promises = relativePaths.map((relativePath) =>
-			this.doesFileExist(relativePath),
-		);
-
-		return Promise.allSettled(promises);
-	}
+	public abstract doesFileExistMany(
+		paths: string[],
+		options?: DoesFileExistOptionsType,
+	): Promise<PromiseSettledResult<boolean>[]>;
 
 	/**
 	 * Returns an async generator that yields file stats for each file in the storage.
 	 */
-	protected abstract getFilesCursor(
+	public abstract getFilesCursor(
 		options?: GetFilesCursorOptions,
-	): AsyncGenerator<GetFileStatsReturnInterface[], void, unknown>;
+	): GetFilesCursorReturnType;
 
 	/**
-	 * Copy a file to provided path.
-	 * Returns the relative path of the copied file.
+	 * Returns file stats for a file.
+	 */
+	public abstract getFileStats(
+		path: string,
+		options?: GetFileStatsOptionsType,
+	): Promise<GetFileStatsReturnType>;
+
+	/**
+	 * Copy a file to provided destination.
 	 * It can only copy to a same storage path.
 	 */
-	protected abstract copy(
-		fromRelativePath: string,
-		toRelativePath: string,
-	): Promise<string>;
+	public abstract copy(
+		input: CopyOrMoveInputInterface,
+		options?: CopyFileOptionsType,
+	): Promise<CopyReturnType>;
 
 	/**
 	 *  Copies multiple files to provided paths
 	 *  Equivalent to
 	 *  @example Promise.allSettled(this.storage.copy(relativePath), this.storage.copy(relativePath))
 	 */
-	public async copyMany(
-		relativePaths: {
-			fromRelativePath: string;
-			toRelativePath: string;
-		}[],
-	): Promise<PromiseSettledResult<string>[]> {
-		const promises = relativePaths.map(({ fromRelativePath, toRelativePath }) =>
-			this.copy(fromRelativePath, toRelativePath),
-		);
-
-		return Promise.allSettled(promises);
-	}
+	public abstract copyMany(
+		input: CopyOrMoveInputInterface[],
+	): Promise<PromiseSettledResult<CopyReturnType>[]>;
 
 	/**
 	 * Moves a file to provided path.
 	 * Returns the relative path of the moved file.
 	 * It can only move to a same storage path.
 	 */
-	protected abstract move(
-		fromRelativePath: string,
-		toRelativePath: string,
-	): Promise<string>;
+	public abstract move(
+		input: CopyOrMoveInputInterface,
+		options?: MoveFileOptionsType,
+	): Promise<MoveReturnType>;
 
 	/**
-	 *  Moves multiple files to provided paths.
+	 *  Moves multiple files to provided destinations.
 	 *  Equivalent to
 	 *  @example Promise.allSettled(this.storage.move(relativePath), this.storage.move(relativePath))
 	 */
-	public async moveMany(
-		relativePaths: {
-			fromRelativePath: string;
-			toRelativePath: string;
-		}[],
-	): Promise<PromiseSettledResult<string>[]> {
-		const promises = relativePaths.map(({ fromRelativePath, toRelativePath }) =>
-			this.move(fromRelativePath, toRelativePath),
-		);
+	public abstract moveMany(
+		input: CopyOrMoveInputInterface[],
+		options?: MoveFileOptionsType,
+	): Promise<PromiseSettledResult<MoveReturnType>[]>;
 
-		return Promise.allSettled(promises);
-	}
+	public abstract getFileStream(
+		path: string,
+		options?: GetFileStreamOptionsType,
+	): Promise<GetFileStreamReturnType>;
 
-	protected abstract getFileStream(
-		relativePath: string,
-	): Promise<GetFileStreamReturnInterface>;
-
-	protected generateFullPath(
+	protected generateSubPath(
 		fileName: string,
-		options: UploadFileOptionsInterface,
+		options: UploadFileLocalOptionsInterface,
 	): string {
-		return path.join(
-			this.getStoragePath(),
-			this.generateSubDirectories(options),
-			fileName,
-		);
-	}
-
-	protected async guessFileType(
-		file: FileType,
-		options: UploadFileOptionsInterface,
-	): Promise<{ file: Buffer | string | Readable; fileName: string }> {
-		const { file: fileFromType, fileType } = await this.getFileType(file);
-
-		return {
-			file: fileFromType,
-			fileName: this.generateUniqueFileName(`base.${fileType.ext}`, options),
-		};
+		return path.join(this.generateSubDirectories(options), fileName);
 	}
 
 	protected async getFileType(
 		file: FileType,
-	): Promise<{ file: Buffer | string | Readable; fileType: FileTypeResult }> {
+	): Promise<{ file: FileType; fileType: FileTypeResult }> {
 		let fileType: FileTypeResult | undefined;
 		let _file = file;
 
@@ -220,7 +203,9 @@ export abstract class AbstractStorage {
 		};
 	}
 
-	private generateSubDirectories(options: UploadFileOptionsInterface): string {
+	protected generateSubDirectories(
+		options: UploadFileLocalOptionsInterface,
+	): string {
 		if (typeof options.generateSubDirectories === 'function') {
 			return options.generateSubDirectories();
 		}
@@ -234,45 +219,35 @@ export abstract class AbstractStorage {
 		return path.join(...pathArray);
 	}
 
-	private generateUniqueFileName(
-		fileName: string,
-		options: UploadFileOptionsInterface,
+	protected generateUniqueFileName(
+		ext: string,
+		options: UploadFileLocalOptionsInterface,
 	): string {
-		const fileExtension = path.extname(fileName);
-
 		if (typeof options.generateUniqueFileName === 'function') {
-			return options.generateUniqueFileName(fileExtension);
+			return options.generateUniqueFileName(ext);
 		}
 
-		return `${crypto.randomUUID()}${fileExtension}`;
+		return `${crypto.randomUUID()}.${ext}`;
 	}
 
-	protected async getUploadParameters(
+	protected async getFile(
 		file: FileType,
-		uploadOptions: UploadFileOptionsInterface,
-	): Promise<{
-		_file: Buffer | string | Readable;
-		_fileName: string;
-		_options: UploadFileOptionsInterface;
-	}> {
+		options: UploadFileLocalOptionsInterface,
+	): Promise<{ file: FileType; fileName: string; fileType: FileTypeResult }> {
 		let _file = file;
-		const options = {
-			...AbstractStorage.defaultUploadOptions,
-			...uploadOptions,
-		};
-
-		if (typeof file === 'string' && isValidURL(file)) {
-			_file = await this.downloadFile(file);
+		if (isValidURL(_file)) {
+			_file = await this.downloadFile(_file);
 		}
 
-		const fileTypeAndFile = await this.guessFileType(_file, options);
+		const { file: fileFromType, fileType } = await this.getFileType(_file);
+		_file = fileFromType;
 
-		_file = fileTypeAndFile.file;
+		const fileName = this.generateUniqueFileName(fileType.ext, options);
 
 		return {
-			_file,
-			_fileName: fileTypeAndFile.fileName,
-			_options: options,
+			file: _file,
+			fileName,
+			fileType,
 		};
 	}
 
@@ -284,7 +259,7 @@ export abstract class AbstractStorage {
 		} else if (file instanceof Readable) {
 			readStream = file;
 		} else {
-			readStream = fs.createReadStream(file);
+			readStream = this.createReadStream(file);
 		}
 
 		return readStream;
@@ -318,19 +293,10 @@ export abstract class AbstractStorage {
 		return Readable.fromWeb(res.body as streamWeb.ReadableStream);
 	}
 
-	protected getStoragePath(): string {
-		const paths = [
-			this.uploadOptions.storage === StorageEnum.LOCAL
-				? // biome-ignore lint/style/noNonNullAssertion: <explanation>
-					this.uploadOptions.options.rootPath!
-				: '',
-			this.uploadOptions.options.path || '',
-		].filter(Boolean);
-
-		return path.join(...paths);
-	}
-
-	protected createReadStream(safePath: string, options?: GetFileStreamOptions) {
+	protected createReadStream(
+		safePath: string,
+		options?: GetFileStreamLocalOptionsInterface,
+	): fs.ReadStream {
 		return fs.createReadStream(safePath, options).on('error', (err) => {
 			this.logger.error(err);
 		});

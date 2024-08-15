@@ -1,9 +1,13 @@
 import { StorageEnum } from '../enum';
 import { FsHelper } from '../helper';
-import { LocalStorageOptionsInterface } from '../interface';
+import {
+	AwsS3StorageInterface,
+	StorageOptionsLocalInterface,
+} from '../interface';
 import { StorageProvidersType } from '../interface';
 import { AbstractStorage } from '../storage';
 import { LocalStorage } from '../storage';
+import { AwsS3Storage } from '../storage/aws-s3.storage';
 
 export class StorageFactory {
 	public static create(
@@ -12,13 +16,13 @@ export class StorageFactory {
 		switch (storageModuleOption.storage) {
 			case StorageEnum.LOCAL:
 				return new LocalStorage(
-					storageModuleOption as LocalStorageOptionsInterface,
+					storageModuleOption as StorageOptionsLocalInterface,
 					new FsHelper(),
 				);
+			case StorageEnum.AWS_S3:
+				return new AwsS3Storage(storageModuleOption as AwsS3StorageInterface);
 			default:
-				throw new Error(
-					`Storage "${storageModuleOption.storage}" not supported`,
-				);
+				throw new Error(`Storage "${storageModuleOption}" not supported`);
 		}
 	}
 }

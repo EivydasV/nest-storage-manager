@@ -1,8 +1,11 @@
 import { ModuleMetadata, Provider, Type } from '@nestjs/common';
 import { StorageEnum } from '../enum';
-import { LocalStorageOptionsInterface } from './local-storage.interface';
+import { AwsS3StorageInterface } from './aws-s3-storage.interface';
+import { StorageOptionsLocalInterface } from './local-storage.interface';
 
-export type StorageProvidersType = LocalStorageOptionsInterface;
+export type StorageProvidersType =
+	| StorageOptionsLocalInterface
+	| AwsS3StorageInterface;
 
 export type StorageProviderOptionsType = StorageProvidersType & {
 	/**
