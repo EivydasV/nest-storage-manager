@@ -1,4 +1,8 @@
-export const isValidURL = (url: string): boolean => {
+export const isValidURL = (url: unknown): url is string => {
+	if (typeof url !== 'string') {
+		return false;
+	}
+
 	try {
 		new URL(url);
 

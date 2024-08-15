@@ -3,6 +3,7 @@ import * as fsPromises from 'node:fs/promises';
 import * as path from 'node:path';
 import { FileDoesNotExistError } from '../error';
 import { FileManagerError } from '../error';
+import { GetFileStatsLocalOptionsType } from '../interface';
 
 export class FsHelper {
 	public async checkIfFileExists(filePath: string): Promise<void> {
@@ -67,9 +68,7 @@ export class FsHelper {
 
 	public async stats(
 		path: string,
-		options?: fs.StatOptions & {
-			bigint?: false | undefined;
-		},
+		options?: GetFileStatsLocalOptionsType,
 	): Promise<fs.Stats> {
 		try {
 			return await fsPromises.stat(path, options);
