@@ -208,7 +208,7 @@ export class AppService {
       generateUniqueFileName: (fileExtension) => {
         return `unique-file-name${fileExtension}`;
       },
-      generateSubDirectories: (options) => { // you can also pass false instead of a function to disable the subdirectory generation
+      generateSubDirectories: () => { // you can also pass false instead of a function to disable the subdirectory generation
         return path.join('cool', 'dir');
       }, 
     });
