@@ -49,7 +49,7 @@ import { StorageEnum, StorageModule } from 'nest-storage-manager';
       storage: StorageEnum.LOCAL, //storage type for now only local is supported
       options: {
         rootPath: process.cwd(), // root path of the storage this is optional and defaults to process.cwd(). This is usefull when you don't want to upload files to the root of the project
-        path: 'uploads', // path to the storage directory. this will append to the rootPath. In this case the path will be `process.cwd()/uploads`
+        bucket: 'uploads', // path to the storage directory. this will append to the rootPath. In this case the path will be `process.cwd()/uploads`
         
       },
     },
@@ -69,7 +69,7 @@ import { StorageEnum, StorageModule } from 'nest-storage-manager';
       storage: StorageEnum.LOCAL, 
       options: {
         rootPath: process.cwd(),
-        path: 'uploads', 
+        bucket: 'uploads', 
         
       },
     },
@@ -103,7 +103,7 @@ import { StorageEnum, StorageModule } from 'nest-storage-manager';
           return {
             storage: StorageEnum.LOCAL,
             options: {
-              path: 'storage',
+              bucket: 'storage',
             },
           };
         },
@@ -114,7 +114,7 @@ import { StorageEnum, StorageModule } from 'nest-storage-manager';
           return {
             storage: StorageEnum.LOCAL,
             options: {
-              path: 'storage',
+              bucket: 'storage',
             },
           };
         },
@@ -137,7 +137,7 @@ When only array passed to register method, the storages will be registered only 
           name: 'test',
           storage: StorageEnum.LOCAL,
           options: {
-            path: 'storage',
+            bucket: 'storage',
             rootPath: process.cwd(),
           },
         },
@@ -169,7 +169,7 @@ export class AppService {
 # Local storage
 
 ## Uploading files
-To upload a file, you can use the `upload` method of the storage. This method returns the relative path of the uploaded file. There is also `uploadMany` method which accepts an array of files and returns a promise that resolves to an array of relative paths.
+To upload a file, you can use the `upload` method of the storage. This method returns the key of the uploaded file. There is also `uploadMany` method which accepts an array of files and returns a promise that resolves to an array of keys.
 ```ts
 import { Injectable, Inject } from '@nestjs/common';
 import { LocalStorage } from 'nest-storage-manager';
@@ -182,8 +182,8 @@ export class AppService {
 
   async uploadFile() {
     const filePath = 'path/to/file.jpg';
-    const relativePath = await this.uploads.upload(filePath);
-    console.log(relativePath); // uploads/c/c/3/d/8/d/c/6/08393b6b-ae49-43b5-a6b5-40b66d57a611.jpg
+    const key = await this.uploads.upload(filePath);
+    console.log(key); // c/c/3/d/8/d/c/6/08393b6b-ae49-43b5-a6b5-40b66d57a611.jpg
     }
   }
 ```
@@ -204,7 +204,7 @@ export class AppService {
 
   async uploadFile() {
     const filePath = 'path/to/file.jpg';
-    const relativePath = await this.uploads.upload(filePath, {
+    const key = await this.uploads.upload(filePath, {
       generateUniqueFileName: (fileExtension) => {
         return `unique-file-name${fileExtension}`;
       },
@@ -212,7 +212,7 @@ export class AppService {
         return path.join('cool', 'dir');
       }, 
     });
-    console.log(relativePath); // uploads/cool/dir/unique-file-name.jpg
+    console.log(key); // cool/dir/unique-file-name.jpg
   }
 }
 ```
@@ -236,7 +236,7 @@ export class AppService {
   @Post()
   @FileInterceptor('file')
   async uploadFile(@UploadedFile() file: Express.Multer.File) {
-    const relativePath = await this.uploads.upload(file.buffer);
+    const key = await this.uploads.upload(file.buffer);
   }
 }
 ```
@@ -254,7 +254,7 @@ export class AppService {
   ) {}
 
   async uploadFile() {
-    const relativePath = await this.uploads.upload(fs.createReadStream('path/to/file.jpg'));
+    const key = await this.uploads.upload(fs.createReadStream('path/to/file.jpg'));
   }
 }
 ```
@@ -271,7 +271,7 @@ export class AppService {
   ) {}
 
   async uploadFile() {
-    const relativePath = await this.uploads.upload('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4');
+    const key = await this.uploads.upload('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4');
   }
 }
 ```
@@ -289,7 +289,7 @@ export class AppService {
   ) {}
 
   async deleteFile() {
-    const deleted = await this.uploads.delete('uploads/c/c/3/d/8/d/c/6/08393b6b-ae49-43b5-a6b5-40b66d57a611.jpg');
+    const deleted = await this.uploads.delete('c/c/3/d/8/d/c/6/08393b6b-ae49-43b5-a6b5-40b66d57a611.jpg');
     console.log(deleted); // true 
   }
 }
@@ -308,7 +308,7 @@ export class AppService {
   ) {}
 
   async checkIfFileExists() {
-    const exists = await this.uploads.doesFileExist('uploads/c/c/3/d/8/d/c/6/08393b6b-ae49-43b5-a6b5-40b66d57a611.jpg');
+    const exists = await this.uploads.doesFileExist('c/c/3/d/8/d/c/6/08393b6b-ae49-43b5-a6b5-40b66d57a611.jpg');
     console.log(exists); // true 
   }
 }
@@ -327,7 +327,7 @@ export class AppService {
   ) {}
 
   async getFileStats() {
-    const stats = await this.uploads.getFileStats('uploads/c/c/3/d/8/d/c/6/08393b6b-ae49-43b5-a6b5-40b66d57a611.jpg');
+    const stats = await this.uploads.getFileStats('c/c/3/d/8/d/c/6/08393b6b-ae49-43b5-a6b5-40b66d57a611.jpg');
     console.log(stats);
   }
 }
@@ -337,7 +337,7 @@ response
 {
     fileName: '10f77d57-00cb-4215-9e89-0b1ce7d7feac.gz',
     absolutePath: '/home/user/Desktop/coding/test-project/uploads/c/d/a/a/d/9/6/d/10f77d57-00cb-4215-9e89-0b1ce7d7feac.gz',
-    relativePath: 'uploads/c/d/a/a/d/9/6/d/10f77d57-00cb-4215-9e89-0b1ce7d7feac.gz',
+    key: 'c/d/a/a/d/9/6/d/10f77d57-00cb-4215-9e89-0b1ce7d7feac.gz',
     mimeType: 'application/gzip',
     fileExtension: 'gz',
     stat: Stats {
@@ -398,8 +398,8 @@ export class AppService {
   ) {}
 
   async copyFile() {
-    const newPath = await this.uploads.copy('uploads/c/c/3/d/8/d/c/6/08393b6b-ae49-43b5-a6b5-40b66d57a611.jpg', 'uploads/c/c/3/d/8/d/c/6/08393b6b-ae49-43b5-a6b5-40b66d57a611-copy.jpg');
-    console.log(newPath); // uploads/c/c/3/d/8/d/c/6/08393b6b-ae49-43b5-a6b5-40b66d57a611-copy.jpg
+    const newPath = await this.uploads.copy('c/c/3/d/8/d/c/6/08393b6b-ae49-43b5-a6b5-40b66d57a611.jpg', 'uploads/c/c/3/d/8/d/c/6/08393b6b-ae49-43b5-a6b5-40b66d57a611-copy.jpg');
+    console.log(newPath); // c/c/3/d/8/d/c/6/08393b6b-ae49-43b5-a6b5-40b66d57a611-copy.jpg
   }
 }
 ```
@@ -417,8 +417,8 @@ export class AppService {
   ) {}
 
   async moveFile() {
-    const newPath = await this.uploads.move('uploads/c/c/3/d/8/d/c/6/08393b6b-ae49-43b5-a6b5-40b66d57a611.jpg', 'uploads/c/c/3/d/8/d/c/6/08393b6b-ae49-43b5-a6b5-40b66d57a611-move.jpg');
-    console.log(newPath); // uploads/c/c/3/d/8/d/c/6/08393b6b-ae49-43b5-a6b5-40b66d57a611-move.jpg
+    const key = await this.uploads.move('c/c/3/d/8/d/c/6/08393b6b-ae49-43b5-a6b5-40b66d57a611.jpg', 'c/c/3/d/8/d/c/6/08393b6b-ae49-43b5-a6b5-40b66d57a611-move.jpg');
+    console.log(key); // c/c/3/d/8/d/c/6/08393b6b-ae49-43b5-a6b5-40b66d57a611-move.jpg
   }
 }
 ```
@@ -443,7 +443,7 @@ export class AppService {
     const isSuccess = uploads.every((item) => item.status === 'fulfilled');
     if (!isSuccess) {
       throw new Error('Upload failed');
-    } // ['uploads/c/c/3/d/8/d/c/6/08393b6b-ae49-43b5-a6b5-40b66d57a611.jpg', 'uploads/c/c/3/d/8/d/c/6/08393b6b-ae49-43b5-a6b5-40b66d57a612.jpg']
+    } // ['c/c/3/d/8/d/c/6/08393b6b-ae49-43b5-a6b5-40b66d57a611.jpg', 'c/c/3/d/8/d/c/6/08393b6b-ae49-43b5-a6b5-40b66d57a612.jpg']
   }
 }
 ```
@@ -462,7 +462,7 @@ export class AppService {
   ) {}
 
   async moveFile() {
-    const options = await this.uploads.options;
+    const options = this.uploads.options;
   }
 }
 ```
@@ -524,7 +524,7 @@ export class AppService {
   ) {}
 
   async test() {
-    const client = await this.s3Storage.client;
+    const client = this.s3Storage.client;
   }
 }
 ```
@@ -549,6 +549,30 @@ export class AppService {
     const res = await client.send(
       new GetObjectCommand({ Bucket: 'test-bucket', Key: 'test.txt' }),
     );
+  }
+}
+```
+
+## File manager class
+File manager class has two methods `copy` and `move`. These methods allow you to copy or move files between different storages.
+```ts
+import { Injectable, Inject } from '@nestjs/common';
+import { LocalStorage, FileManager, AwsS3Storage } from 'nest-storage-manager';
+
+@Injectable()
+export class AppService {
+  constructor(
+    @Inject('s3') private readonly s3Storage: AwsS3Storage,
+    @Inject('local') private readonly localStorage: LocalStorage,
+    private readonly fileManager: FileManager
+  ) {}
+
+  async test() {
+    const copy = await this.fileManager.copy({
+      sourceStorage: this.localStorage,
+      destinationStorage: this.s3Storage,
+      sourceFile: 'e/f/7/3/f/a/5/0/147bad57-040c-448e-a768-867c5c27ca3f.jpg',
+    });
   }
 }
 ```

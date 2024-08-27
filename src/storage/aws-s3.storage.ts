@@ -1,4 +1,3 @@
-import * as path from 'node:path';
 import {
 	CopyObjectCommand,
 	CopyObjectCommandOutput,
@@ -70,7 +69,7 @@ export class AwsS3Storage extends AbstractStorage {
 			...options,
 		};
 
-		const fileData = await this.getFile(file, uploadOptions);
+		const fileData = await this.getFileInfo(file, uploadOptions);
 
 		return await this.createUpload(
 			fileData.file,
@@ -122,11 +121,6 @@ export class AwsS3Storage extends AbstractStorage {
 		return await this.s3Client.send(deleteCommand);
 	}
 
-	/**
-	 * @param {String[]} keys
-	 * @param {DeleteS3OptionsType} [options]
-	 * @return {Promise<PromiseSettledResult<DeleteObjectCommandOutput>[]>}
-	 */
 	public deleteMany(
 		keys: string[],
 		options?: DeleteS3OptionsType,
@@ -209,7 +203,7 @@ export class AwsS3Storage extends AbstractStorage {
 		return Promise.allSettled(promises);
 	}
 
-	public async getFileStream(
+	public async getFile(
 		key: string,
 		options?: GetFileStreamS3OptionsType,
 	): Promise<GetObjectCommandOutput> {
@@ -220,12 +214,5 @@ export class AwsS3Storage extends AbstractStorage {
 		});
 
 		return await this.s3Client.send(getObjectCommand);
-	}
-
-	private joinPath(...paths: string[]): string {
-		const joinPath = path.join(...paths);
-
-		// for Windows users we need to replace the backslash with a forward slash for s3 paths
-		return joinPath.replace(/\\/g, '/');
 	}
 }

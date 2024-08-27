@@ -7,6 +7,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import { Paginator } from '@smithy/types/dist-types/pagination';
+import { FileType } from '../type';
 import {
 	AwsS3StorageOptionsType,
 	CopyFileS3OptionsType,
@@ -18,17 +19,18 @@ import {
 	UploadS3FileOptionsInterface,
 } from './aws-s3-storage.interface';
 import {
+	GetFileLocalReturnInterface,
 	GetFileStatsLocalOptionsType,
 	GetFileStatsLocalReturnInterface,
 	GetFileStreamLocalOptionsInterface,
-	GetFileStreamLocalReturnInterface,
 	GetFilesCursorLocalOptions,
 	GetFilesCursorLocalReturnType,
 	StorageLocalOptionsType,
 	UploadFileLocalOptionsInterface,
+	UploadFileLocalReturnInterface,
 } from './local-storage.interface';
 
-export type UploadReturnType = Upload | string;
+export type UploadReturnType = Upload | UploadFileLocalReturnInterface;
 
 export type DeleteReturnType = DeleteObjectCommandOutput | boolean;
 
@@ -41,7 +43,7 @@ export type GetFilesCursorReturnType =
 
 export type GetFileStreamReturnType =
 	| GetObjectCommandOutput
-	| GetFileStreamLocalReturnInterface;
+	| GetFileLocalReturnInterface;
 
 export type GetFileStatsReturnType =
 	| GetFileStatsLocalReturnInterface
@@ -75,4 +77,8 @@ export type GetOptionsType = AwsS3StorageOptionsType | StorageLocalOptionsType;
 export interface CopyOrMoveInputInterface {
 	from: string;
 	to: string;
+}
+
+export interface UploadFileOptionsInterface {
+	file: FileType;
 }

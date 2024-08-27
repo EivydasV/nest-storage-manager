@@ -1,14 +1,19 @@
 import * as fs from 'node:fs';
 import * as fsPromises from 'node:fs/promises';
 import * as path from 'node:path';
+import { Injectable } from '@nestjs/common';
 import { FileDoesNotExistError } from '../error';
 import { FileManagerError } from '../error';
 import { GetFileStatsLocalOptionsType } from '../interface';
 
+@Injectable()
 export class FsHelper {
 	public async checkIfFileExists(filePath: string): Promise<void> {
 		try {
-			await fsPromises.access(filePath);
+			const stats = await fsPromises.stat(filePath);
+			if (!stats.isFile()) {
+				throw new Error(`"${filePath}" is not a file`);
+			}
 		} catch (err) {
 			throw new FileDoesNotExistError(filePath);
 		}

@@ -1,5 +1,4 @@
 import * as fs from 'node:fs';
-import { OpenDirOptions, StatOptions, Stats } from 'node:fs';
 import { Readable } from 'node:stream';
 import { MimeType } from 'file-type/core';
 import { StorageEnum } from '../enum';
@@ -9,7 +8,7 @@ export type StorageLocalOptionsType = Required<
 	StorageOptionsLocalInterface['options']
 >;
 
-export type GetFileStatsLocalOptionsType = StatOptions & {
+export type GetFileStatsLocalOptionsType = fs.StatOptions & {
 	bigint?: false | undefined;
 };
 
@@ -19,6 +18,12 @@ export type GetFilesCursorLocalReturnType = AsyncGenerator<
 	unknown
 >;
 
+export interface UploadFileLocalReturnInterface {
+	key: string;
+	absolutePath: string;
+	bucket: string;
+}
+
 /**
  * Interface for configuring local storage options.
  */
@@ -26,10 +31,10 @@ export interface StorageOptionsLocalInterface
 	extends BaseStorageOptionsInterface<StorageEnum.LOCAL> {
 	options: {
 		/**
-		 * The path to the local storage directory.
+		 * The storage location to the local storage directory.
 		 * It will suffix for the `rootPath`.
 		 */
-		path: string;
+		bucket: string;
 
 		/**
 		 * The root path of the local storage directory.
@@ -75,7 +80,7 @@ export interface UploadFileLocalOptionsInterface {
  * Interface for configuring file upload options.
  */
 export interface GetFilesCursorLocalOptions
-	extends Omit<OpenDirOptions, 'recursive'> {
+	extends Omit<fs.OpenDirOptions, 'recursive'> {
 	/**
 	 * The number of files to return per page.
 	 * @default 10
@@ -113,49 +118,14 @@ export interface GetFileStatsLocalReturnInterface {
 	absolutePath: string;
 
 	/**
-	 * The relative path of the file. Example: `uploads/fileName.jpg`
+	 * The key of the file
 	 */
-	relativePath: string;
+	key: string;
 
 	/**
-	 * The file type of the file. Example: `image/jpeg`
+	 * The storage location of the file. Example: `uploads`
 	 */
-	mimeType: MimeType;
-
-	/**
-	 * The file extension. Example: `.jpeg`
-	 */
-	fileExtension: string;
-
-	/**
-	 * Node.js `fs.Stats` object.
-	 */
-	stat: Stats;
-}
-
-/**
- * Interface for returning a readable stream of a file.
- */
-export interface GetFileStreamLocalReturnInterface {
-	/**
-	 * The readable stream of the file.
-	 */
-	stream: Readable;
-
-	/**
-	 * The file name. Example: `fileName.jpg`
-	 */
-	fileName: string;
-
-	/**
-	 * The absolute path of the file. Example: `/home/user/uploads/fileName.jpg`
-	 */
-	absolutePath: string;
-
-	/**
-	 * The relative path of the file. Example: `uploads/fileName.jpg`
-	 */
-	relativePath: string;
+	bucket: string;
 
 	/**
 	 * The file type of the file. Example: `image/jpeg`
@@ -171,4 +141,15 @@ export interface GetFileStreamLocalReturnInterface {
 	 * Node.js `fs.Stats` object.
 	 */
 	stat: fs.Stats;
+}
+
+/**
+ * Interface for returning a readable stream of a file.
+ */
+export interface GetFileLocalReturnInterface
+	extends GetFileStatsLocalReturnInterface {
+	/**
+	 * The readable stream of the file.
+	 */
+	stream: Readable;
 }

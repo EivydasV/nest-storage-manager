@@ -7,7 +7,7 @@ import {
 import { StorageProvidersType } from '../interface';
 import { AbstractStorage } from '../storage';
 import { LocalStorage } from '../storage';
-import { AwsS3Storage } from '../storage/aws-s3.storage';
+import { AwsS3Storage } from '../storage';
 
 export class StorageFactory {
 	public static create(
