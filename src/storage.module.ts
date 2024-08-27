@@ -1,5 +1,6 @@
 import { DynamicModule, Module, Provider } from '@nestjs/common';
-import { StorageFactory } from './factory';
+import { StorageFactory, TransferFactory } from './factory';
+import { FsHelper } from './helper';
 import {
 	StorageModuleAsyncOptionsType,
 	StorageModuleOptionsFactory,
@@ -7,9 +8,25 @@ import {
 	StorageProviderOptionsType,
 	StoragesProviderAsyncOptions,
 } from './interface';
-import { uniqueArray } from './util/unique-array';
+import { FileManager } from './manager';
+import { LocalToS3Transfer } from './transfer';
+import { LocalToLocalTransfer } from './transfer/local-to-local.transfer';
+import { S3ToLocalTransfer } from './transfer/s3-to-local.transfer';
+import { S3ToS3Transfer } from './transfer/s3-to-s3.transfer';
+import { uniqueArray } from './util';
 
-@Module({})
+@Module({
+	providers: [
+		FileManager,
+		TransferFactory,
+		LocalToLocalTransfer,
+		LocalToS3Transfer,
+		S3ToLocalTransfer,
+		S3ToS3Transfer,
+		FsHelper,
+	],
+	exports: [FileManager],
+})
 export class StorageModule {
 	public static register(options: StorageModuleOptionsType): DynamicModule {
 		const uploaderModuleOptions = Array.isArray(options)

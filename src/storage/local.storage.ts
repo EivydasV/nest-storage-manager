@@ -5,16 +5,17 @@ import { FileManagerError, InvalidPathError } from '../error';
 import { FsHelper } from '../helper';
 import {
 	CopyOrMoveInputInterface,
+	GetFileLocalReturnInterface,
 	GetFileStatsLocalOptionsType,
 	GetFileStatsLocalReturnInterface,
 	GetFileStreamLocalOptionsInterface,
-	GetFileStreamLocalReturnInterface,
 	GetFilesCursorLocalOptions,
 	GetFilesCursorLocalReturnType,
 	MoveReturnType,
 	StorageLocalOptionsType,
 	StorageOptionsLocalInterface,
 	UploadFileLocalOptionsInterface,
+	UploadFileLocalReturnInterface,
 } from '../interface';
 import { FileType } from '../type';
 import { AbstractStorage } from './abstract.storage';
@@ -97,8 +98,8 @@ export class LocalStorage extends AbstractStorage {
 	 * @throws FileDoesNotExistError
 	 * @throws FileManagerError
 	 */
-	public async delete(relativePath: string): Promise<boolean> {
-		const safePath = this.getSafePath(relativePath);
+	public async delete(key: string): Promise<boolean> {
+		const safePath = this.getSafePath(key);
 
 		await this.fsHelper.checkIfFileExists(safePath);
 
@@ -108,11 +109,9 @@ export class LocalStorage extends AbstractStorage {
 	}
 
 	public async deleteMany(
-		relativePaths: string[],
+		keys: string[],
 	): Promise<PromiseSettledResult<boolean>[]> {
-		const promises = relativePaths.map((relativePath) =>
-			this.delete(relativePath),
-		);
+		const promises = keys.map((key) => this.delete(key));
 
 		return Promise.allSettled(promises);
 	}
@@ -125,19 +124,25 @@ export class LocalStorage extends AbstractStorage {
 	public async upload(
 		file: FileType,
 		options?: UploadFileLocalOptionsInterface,
-	): Promise<string> {
+	): Promise<UploadFileLocalReturnInterface> {
 		const uploadOptions = {
 			...AbstractStorage.defaultUploadOptions,
 			...options,
 		};
 
-		return this.writeToDisk(file, uploadOptions);
+		const fileKey = await this.writeToDisk(file, uploadOptions);
+
+		return {
+			bucket: this.options.bucket,
+			key: this.getRelativePath(fileKey),
+			absolutePath: fileKey,
+		};
 	}
 
 	public async uploadMany(
 		files: FileType[],
 		options?: UploadFileLocalOptionsInterface,
-	): Promise<PromiseSettledResult<string>[]> {
+	): Promise<PromiseSettledResult<UploadFileLocalReturnInterface>[]> {
 		const promises = files.map((file) => this.upload(file, options));
 
 		return Promise.allSettled(promises);
@@ -181,8 +186,8 @@ export class LocalStorage extends AbstractStorage {
 	/**
 	 * @throws InvalidPathError
 	 */
-	public async doesFileExist(relativePath: string): Promise<boolean> {
-		const safePath = this.getSafePath(relativePath);
+	public async doesFileExist(key: string): Promise<boolean> {
+		const safePath = this.getSafePath(key);
 
 		try {
 			await this.fsHelper.checkIfFileExists(safePath);
@@ -194,11 +199,9 @@ export class LocalStorage extends AbstractStorage {
 	}
 
 	public async doesFileExistMany(
-		relativePaths: string[],
+		keys: string[],
 	): Promise<PromiseSettledResult<boolean>[]> {
-		const promises = relativePaths.map((relativePath) =>
-			this.doesFileExist(relativePath),
-		);
+		const promises = keys.map((key) => this.doesFileExist(key));
 
 		return Promise.allSettled(promises);
 	}
@@ -210,10 +213,10 @@ export class LocalStorage extends AbstractStorage {
 	 * @throws FileTypeError
 	 */
 	public async getFileStats(
-		relativePath: string,
+		key: string,
 		options?: GetFileStatsLocalOptionsType,
 	): Promise<GetFileStatsLocalReturnInterface> {
-		const safePath = this.getSafePath(relativePath);
+		const safePath = this.getSafePath(key);
 
 		await this.fsHelper.checkIfFileExists(safePath);
 
@@ -226,11 +229,11 @@ export class LocalStorage extends AbstractStorage {
 	 * @throws FileManagerError
 	 * @throws FileTypeError
 	 */
-	public async getFileStream(
-		relativePath: string,
+	public async getFile(
+		key: string,
 		options?: GetFileStreamLocalOptionsInterface,
-	): Promise<GetFileStreamLocalReturnInterface> {
-		const safePath = this.getSafePath(relativePath);
+	): Promise<GetFileLocalReturnInterface> {
+		const safePath = this.getSafePath(key);
 		await this.fsHelper.checkIfFileExists(safePath);
 
 		const fileWithType = await this.internalGetFileStats(safePath);
@@ -245,7 +248,10 @@ export class LocalStorage extends AbstractStorage {
 		file: FileType,
 		options: UploadFileLocalOptionsInterface,
 	): Promise<string> {
-		const { file: fileFromType, fileName } = await this.getFile(file, options);
+		const { file: fileFromType, fileName } = await this.getFileInfo(
+			file,
+			options,
+		);
 
 		const filePath = await this.generateFullPath(fileName, options);
 
@@ -267,31 +273,21 @@ export class LocalStorage extends AbstractStorage {
 			fs.createWriteStream(filePath),
 		);
 
-		return this.getRelativePath(filePath);
+		return filePath;
 	}
 
-	private getSafePath(filePath: string): string {
-		const error = new InvalidPathError(filePath, this.options.path);
-
-		const splitPath = filePath.split(path.sep);
-		if (this.options.path !== splitPath.shift()) {
-			throw error;
-		}
-
-		const resolvedPath = path.resolve(
-			this.getStoragePath(),
-			path.join(...splitPath),
-		);
+	public getSafePath(filePath: string): string {
+		const resolvedPath = path.resolve(this.getStoragePath(), filePath);
 
 		if (!resolvedPath.startsWith(this.getStoragePath())) {
-			throw error;
+			throw new InvalidPathError(resolvedPath);
 		}
 
 		return resolvedPath;
 	}
 
 	private getRelativePath(absolutePath: string): string {
-		return path.relative(this.options.rootPath, absolutePath);
+		return path.relative(this.getStoragePath(), absolutePath);
 	}
 
 	private async internalGetFileStats(
@@ -307,9 +303,10 @@ export class LocalStorage extends AbstractStorage {
 		]);
 
 		return {
+			bucket: this.options.bucket,
 			fileName: path.basename(absoluteFilePath),
 			absolutePath: absoluteFilePath,
-			relativePath: this.getRelativePath(absoluteFilePath),
+			key: this.getRelativePath(absoluteFilePath),
 			mimeType: fileWithFileType.fileType.mime,
 			fileExtension: fileWithFileType.fileType.ext,
 			stat,
@@ -321,7 +318,7 @@ export class LocalStorage extends AbstractStorage {
 	): Promise<GetFileStatsLocalReturnInterface[]> {
 		return Promise.all(
 			files.map(async (file) => {
-				const absolutePath = path.join(file.parentPath, file.name);
+				const absolutePath = this.joinPath(file.parentPath, file.name);
 
 				return this.internalGetFileStats(absolutePath);
 			}),
@@ -332,7 +329,7 @@ export class LocalStorage extends AbstractStorage {
 		fileName: string,
 		options: UploadFileLocalOptionsInterface,
 	): Promise<string> {
-		const genPath = path.join(
+		const genPath = this.joinPath(
 			this.getStoragePath(),
 			this.generateSubDirectories(options),
 			fileName,
@@ -346,6 +343,6 @@ export class LocalStorage extends AbstractStorage {
 	}
 
 	private getStoragePath(): string {
-		return path.join(this.options.rootPath, this.options.path);
+		return this.joinPath(this.options.rootPath, this.options.bucket);
 	}
 }

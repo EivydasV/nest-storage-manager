@@ -6,3 +6,6 @@ export * from './enum';
 export * from './error';
 export * from './factory';
 export * from './interface';
+export * from './manager';
+export * from './transfer';
+export * from './util';

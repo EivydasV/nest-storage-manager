@@ -29,8 +29,7 @@ import {
 	UploadReturnType,
 } from '../interface';
 import { FileType } from '../type';
-import { importESM } from '../util/import-esm-module';
-import { isValidURL } from '../util/is-valid-url';
+import { importESM, isValidURL, pathJoin } from '../util';
 
 export abstract class AbstractStorage {
 	protected readonly logger = new Logger(AbstractStorage.name);
@@ -45,7 +44,9 @@ export abstract class AbstractStorage {
 		perPage: 10,
 	};
 
-	protected constructor(private readonly uploadOptions: StorageProvidersType) {}
+	protected constructor(
+		private readonly storageOptions: StorageProvidersType,
+	) {}
 
 	/**
 	 * Returns options which were passed to `register` or `registerAsync` method.
@@ -72,7 +73,6 @@ export abstract class AbstractStorage {
 
 	/**
 	 * Deletes a file from the storage.
-	 * Returns `true` if the file was deleted successfully, otherwise `false`.
 	 */
 	public abstract delete(
 		path: string,
@@ -82,7 +82,7 @@ export abstract class AbstractStorage {
 	/**
 	 * Deletes multiple files from the storage.
 	 *  Equivalent to
-	 *  @example Promise.allSettled(this.storage.delete(relativeFilePath), this.storage.delete(relativeFilePath))
+	 *  @example Promise.allSettled(this.storage.delete(key), this.storage.delete(key))
 	 */
 	public abstract deleteMany(
 		paths: string[],
@@ -101,7 +101,7 @@ export abstract class AbstractStorage {
 	/**
 	 *  Checks if multiple files exist in the storage.
 	 *  Equivalent to
-	 *  @example Promise.allSettled(this.storage.doesFileExist(relativeFilePath), this.storage.doesFileExist(relativeFilePath))
+	 *  @example Promise.allSettled(this.storage.doesFileExist(key), this.storage.doesFileExist(key))
 	 */
 
 	public abstract doesFileExistMany(
@@ -136,7 +136,7 @@ export abstract class AbstractStorage {
 	/**
 	 *  Copies multiple files to provided paths
 	 *  Equivalent to
-	 *  @example Promise.allSettled(this.storage.copy(relativePath), this.storage.copy(relativePath))
+	 *  @example Promise.allSettled(this.storage.copy(key), this.storage.copy(key))
 	 */
 	public abstract copyMany(
 		input: CopyOrMoveInputInterface[],
@@ -144,7 +144,7 @@ export abstract class AbstractStorage {
 
 	/**
 	 * Moves a file to provided path.
-	 * Returns the relative path of the moved file.
+	 * Returns the key of the moved file.
 	 * It can only move to a same storage path.
 	 */
 	public abstract move(
@@ -155,24 +155,17 @@ export abstract class AbstractStorage {
 	/**
 	 *  Moves multiple files to provided destinations.
 	 *  Equivalent to
-	 *  @example Promise.allSettled(this.storage.move(relativePath), this.storage.move(relativePath))
+	 *  @example Promise.allSettled(this.storage.move(key), this.storage.move(key))
 	 */
 	public abstract moveMany(
 		input: CopyOrMoveInputInterface[],
 		options?: MoveFileOptionsType,
 	): Promise<PromiseSettledResult<MoveReturnType>[]>;
 
-	public abstract getFileStream(
+	public abstract getFile(
 		path: string,
 		options?: GetFileStreamOptionsType,
 	): Promise<GetFileStreamReturnType>;
-
-	protected generateSubPath(
-		fileName: string,
-		options: UploadFileLocalOptionsInterface,
-	): string {
-		return path.join(this.generateSubDirectories(options), fileName);
-	}
 
 	protected async getFileType(
 		file: FileType,
@@ -216,7 +209,7 @@ export abstract class AbstractStorage {
 
 		const pathArray = crypto.randomBytes(4).toString('hex').split('');
 
-		return path.join(...pathArray);
+		return this.joinPath(...pathArray);
 	}
 
 	protected generateUniqueFileName(
@@ -230,7 +223,7 @@ export abstract class AbstractStorage {
 		return `${crypto.randomUUID()}.${ext}`;
 	}
 
-	protected async getFile(
+	protected async getFileInfo(
 		file: FileType,
 		options: UploadFileLocalOptionsInterface,
 	): Promise<{ file: FileType; fileName: string; fileType: FileTypeResult }> {
@@ -300,5 +293,9 @@ export abstract class AbstractStorage {
 		return fs.createReadStream(safePath, options).on('error', (err) => {
 			this.logger.error(err);
 		});
+	}
+
+	protected joinPath(...paths: string[]): string {
+		return pathJoin(this.storageOptions.storage, ...paths);
 	}
 }
