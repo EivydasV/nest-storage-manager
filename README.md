@@ -182,7 +182,7 @@ export class AppService {
 
   async uploadFile() {
     const filePath = 'path/to/file.jpg';
-    const key = await this.uploads.upload(filePath);
+    const fileInfo = await this.uploads.upload(filePath);
     }
   }
 ```
@@ -211,7 +211,7 @@ export class AppService {
 
   async uploadFile() {
     const filePath = 'path/to/file.jpg';
-    const file = await this.uploads.upload(filePath, {
+    const fileInfo = await this.uploads.upload(filePath, {
       generateUniqueFileName: (fileExtension) => {
         return `unique-file-name${fileExtension}`;
       },
@@ -219,7 +219,7 @@ export class AppService {
         return path.join('cool', 'dir');
       }, 
     });
-    console.log(file.key); // cool/dir/unique-file-name.jpg
+    console.log(fileInfo.key); // cool/dir/unique-file-name.jpg
   }
 }
 ```
@@ -243,7 +243,7 @@ export class AppService {
   @Post()
   @FileInterceptor('file')
   async uploadFile(@UploadedFile() file: Express.Multer.File) {
-    const file = await this.uploads.upload(file.buffer);
+    const fileInfo = await this.uploads.upload(file.buffer);
   }
 }
 ```
