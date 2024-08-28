@@ -1,6 +1,6 @@
 {
 	"name": "nest-storage-manager",
-	"version": "2.0.1",
+	"version": "2.0.2",
 	"description": "Nestjs file manager for local storage",
 	"author": "EivydasV",
 	"main": "dist/index.js",
