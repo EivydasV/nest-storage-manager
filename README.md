@@ -183,9 +183,16 @@ export class AppService {
   async uploadFile() {
     const filePath = 'path/to/file.jpg';
     const key = await this.uploads.upload(filePath);
-    console.log(key); // c/c/3/d/8/d/c/6/08393b6b-ae49-43b5-a6b5-40b66d57a611.jpg
     }
   }
+```
+response 
+```ts
+{
+    bucket: 'temp',
+    key: '1/f/8/0/0/5/d/e/4b8ccba1-94a6-4db2-bedb-a5a5985c3658.jpg',
+    absolutePath: '/home/user/Desktop/coding/test-project/uploads/1/f/8/0/0/5/d/e/4b8ccba1-94a6-4db2-bedb-a5a5985c3658.jpg'
+}
 ```
 as you can see in the example above it will generate a unique file name based on the file extension using the `crypto.randomUUID()` function.
 And it will generate a random subdirectory for the file. This done to improve file search speed and better scalability.
@@ -204,7 +211,7 @@ export class AppService {
 
   async uploadFile() {
     const filePath = 'path/to/file.jpg';
-    const key = await this.uploads.upload(filePath, {
+    const file = await this.uploads.upload(filePath, {
       generateUniqueFileName: (fileExtension) => {
         return `unique-file-name${fileExtension}`;
       },
@@ -212,7 +219,7 @@ export class AppService {
         return path.join('cool', 'dir');
       }, 
     });
-    console.log(key); // cool/dir/unique-file-name.jpg
+    console.log(file.key); // cool/dir/unique-file-name.jpg
   }
 }
 ```
@@ -236,7 +243,7 @@ export class AppService {
   @Post()
   @FileInterceptor('file')
   async uploadFile(@UploadedFile() file: Express.Multer.File) {
-    const key = await this.uploads.upload(file.buffer);
+    const file = await this.uploads.upload(file.buffer);
   }
 }
 ```
@@ -254,7 +261,7 @@ export class AppService {
   ) {}
 
   async uploadFile() {
-    const key = await this.uploads.upload(fs.createReadStream('path/to/file.jpg'));
+    const file = await this.uploads.upload(fs.createReadStream('path/to/file.jpg'));
   }
 }
 ```
@@ -271,7 +278,7 @@ export class AppService {
   ) {}
 
   async uploadFile() {
-    const key = await this.uploads.upload('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4');
+    const file = await this.uploads.upload('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4');
   }
 }
 ```
@@ -335,6 +342,7 @@ export class AppService {
 response 
 ```ts
 {
+    bucket: 'uploads',
     fileName: '10f77d57-00cb-4215-9e89-0b1ce7d7feac.gz',
     absolutePath: '/home/user/Desktop/coding/test-project/uploads/c/d/a/a/d/9/6/d/10f77d57-00cb-4215-9e89-0b1ce7d7feac.gz',
     key: 'c/d/a/a/d/9/6/d/10f77d57-00cb-4215-9e89-0b1ce7d7feac.gz',
@@ -443,7 +451,7 @@ export class AppService {
     const isSuccess = uploads.every((item) => item.status === 'fulfilled');
     if (!isSuccess) {
       throw new Error('Upload failed');
-    } // ['c/c/3/d/8/d/c/6/08393b6b-ae49-43b5-a6b5-40b66d57a611.jpg', 'c/c/3/d/8/d/c/6/08393b6b-ae49-43b5-a6b5-40b66d57a612.jpg']
+    } 
   }
 }
 ```
@@ -576,3 +584,4 @@ export class AppService {
   }
 }
 ```
+response type differs from storage to storage.
