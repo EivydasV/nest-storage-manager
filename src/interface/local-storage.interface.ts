@@ -1,12 +1,15 @@
 import * as fs from 'node:fs';
 import { Readable } from 'node:stream';
 import { MimeType } from 'file-type/core';
-import { StorageEnum } from '../enum';
+import { ExtensionDetectionMethod, StorageEnum } from '../enum';
+import { EncryptionAlgorithm } from '../type';
+import { UploadFileOptionsInterface } from './abstract-storage.interface';
 import { BaseStorageOptionsInterface } from './storage-module-options.interface';
 
 export type StorageLocalOptionsType = Required<
-	StorageOptionsLocalInterface['options']
->;
+	Pick<StorageOptionsLocalInterface['options'], 'rootPath'>
+> &
+	StorageOptionsLocalInterface['options'];
 
 export type GetFileStatsLocalOptionsType = fs.StatOptions & {
 	bigint?: false | undefined;
@@ -41,32 +44,17 @@ export interface StorageOptionsLocalInterface
 		 * @default process.cwd()
 		 */
 		rootPath?: string;
+
+		encryptionKey?: string;
+		encryptionAlgorithm?: EncryptionAlgorithm;
 	};
 }
 
 /**
  * Interface for configuring file upload options.
  */
-export interface UploadFileLocalOptionsInterface {
-	/**
-	 * Determines whether to generate subdirectories for file storage.
-	 * When set to `true`, subdirectories will be generated to improve file search speed.
-	 * Example path: `uploads/9/0/1/d/0/2/2/f/fileName.jpg`, where the subdirectory is `/9/0/1/d/0/2/2/f/`.
-	 * You can disable this behavior by specifying `false`, or you can pass a custom function that returns the subdirectory string path.
-	 *
-	 * @default true
-	 */
-	generateSubDirectories?: boolean | (() => string);
-
-	/**
-	 * Determines whether to generate a unique file name.
-	 * When set to `true`, a unique file name is generated using `crypto.randomUUID()`.
-	 * You can also specify a custom function that returns the file name based on the file extension.
-	 *
-	 * @default true
-	 */
-	generateUniqueFileName?: true | ((fileExtension: string) => string);
-
+export interface UploadFileLocalOptionsInterface
+	extends UploadFileOptionsInterface {
 	/**
 	 * Determines whether to delete a file if an error occurs while writing it using a stream.
 	 * If set to `true`, the file will be deleted in case of a write error to prevent it from being left in a corrupted state.
@@ -133,7 +121,7 @@ export interface GetFileStatsLocalReturnInterface {
 	mimeType: MimeType;
 
 	/**
-	 * The file extension. Example: `.jpeg`
+	 * The file extension. Example: `jpeg`
 	 */
 	fileExtension: string;
 

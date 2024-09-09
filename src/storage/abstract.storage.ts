@@ -1,11 +1,16 @@
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
+import { PathLike } from 'node:fs';
 import * as path from 'node:path';
 import { Readable } from 'node:stream';
 import * as streamWeb from 'node:stream/web';
 import { Logger } from '@nestjs/common';
 import { FileTypeResult } from 'file-type';
-import { FileDownloadError, FileTypeError } from '../error';
+import { FileExtension, MimeType } from 'file-type/core';
+import * as mime from 'mime-types';
+import { MAX_BUFFER_SIZE } from '../constant';
+import { ExtensionDetectionMethod } from '../enum';
+import { FileDownloadError, FileManagerError, FileTypeError } from '../error';
 import {
 	CopyFileOptionsType,
 	CopyOrMoveInputInterface,
@@ -13,6 +18,7 @@ import {
 	DeleteFileOptionsType,
 	DeleteReturnType,
 	DoesFileExistOptionsType,
+	GetFileInfoReturnType,
 	GetFileStatsOptionsType,
 	GetFileStatsReturnType,
 	GetFileStreamLocalOptionsInterface,
@@ -38,6 +44,7 @@ export abstract class AbstractStorage {
 		generateSubDirectories: true,
 		generateUniqueFileName: true,
 		deleteFileOnError: true,
+		extensionDetectionMethod: ExtensionDetectionMethod.FROM_BUFFER,
 	};
 
 	protected static defaultGetFilesCursorOptions = {
@@ -169,9 +176,28 @@ export abstract class AbstractStorage {
 
 	protected async getFileType(
 		file: FileType,
+		options: UploadFileLocalOptionsInterface,
 	): Promise<{ file: FileType; fileType: FileTypeResult }> {
 		let fileType: FileTypeResult | undefined;
 		let _file = file;
+
+		if (
+			options.extensionDetectionMethod ===
+			ExtensionDetectionMethod.FROM_FILE_NAME
+		) {
+			if (!options?.fileName) {
+				throw new Error(
+					`fileName is required when using "${ExtensionDetectionMethod.FROM_FILE_NAME}"`,
+				);
+			}
+
+			const fileType = await this.getFileTypeFromPath(options.fileName);
+
+			return {
+				file: _file,
+				fileType: fileType,
+			};
+		}
 
 		const typeDetector =
 			await importESM<typeof import('file-type')>('file-type');
@@ -226,13 +252,16 @@ export abstract class AbstractStorage {
 	protected async getFileInfo(
 		file: FileType,
 		options: UploadFileLocalOptionsInterface,
-	): Promise<{ file: FileType; fileName: string; fileType: FileTypeResult }> {
+	): Promise<GetFileInfoReturnType> {
 		let _file = file;
 		if (isValidURL(_file)) {
 			_file = await this.downloadFile(_file);
 		}
 
-		const { file: fileFromType, fileType } = await this.getFileType(_file);
+		const { file: fileFromType, fileType } = await this.getFileType(
+			_file,
+			options,
+		);
 		_file = fileFromType;
 
 		const fileName = this.generateUniqueFileName(fileType.ext, options);
@@ -244,18 +273,21 @@ export abstract class AbstractStorage {
 		};
 	}
 
-	protected async getReadStream(file: FileType): Promise<Readable> {
-		let readStream: Readable;
-
+	protected getReadStream(file: FileType): Readable {
 		if (Buffer.isBuffer(file)) {
-			readStream = Readable.from(file);
-		} else if (file instanceof Readable) {
-			readStream = file;
-		} else {
-			readStream = this.createReadStream(file);
+			if (file.length > MAX_BUFFER_SIZE) {
+				throw new FileManagerError(
+					`Max buffer size is ${MAX_BUFFER_SIZE} bytes. Provided buffer size is ${file.length} bytes. This limitation is imposed by node.js.`,
+				);
+			}
+
+			return Readable.from(file);
+		}
+		if (file instanceof Readable) {
+			return file;
 		}
 
-		return readStream;
+		return this.createReadStream(file);
 	}
 
 	protected async downloadFile(url: string): Promise<Readable> {
@@ -267,19 +299,11 @@ export abstract class AbstractStorage {
 		const typeDetector =
 			await importESM<typeof import('file-type')>('file-type');
 
-		let isFile = false;
+		const contentType = res.headers.get('content-type');
 
-		for (const mimeType of typeDetector.supportedMimeTypes) {
-			if (res.headers.get('content-type')?.includes(mimeType)) {
-				isFile = true;
-
-				break;
-			}
-		}
-
-		if (!isFile) {
+		if (!typeDetector.supportedMimeTypes.has(contentType as MimeType)) {
 			throw new FileDownloadError(
-				`Provided url "${url}" did not return a file. Returned content-type: "${res.headers.get('content-type')}"`,
+				`Provided url "${url}" did not return a file. Returned content-type: "${contentType}"`,
 			);
 		}
 
@@ -287,7 +311,7 @@ export abstract class AbstractStorage {
 	}
 
 	protected createReadStream(
-		safePath: string,
+		safePath: PathLike,
 		options?: GetFileStreamLocalOptionsInterface,
 	): fs.ReadStream {
 		return fs.createReadStream(safePath, options).on('error', (err) => {
@@ -295,7 +319,29 @@ export abstract class AbstractStorage {
 		});
 	}
 
+	protected createWriteStream(
+		safePath: PathLike,
+		options?: GetFileStreamLocalOptionsInterface,
+	): fs.WriteStream {
+		return fs.createWriteStream(safePath, options).on('error', (err) => {
+			this.logger.error(err);
+		});
+	}
+
 	protected joinPath(...paths: string[]): string {
 		return pathJoin(this.storageOptions.storage, ...paths);
+	}
+
+	protected async getFileTypeFromPath(file: string): Promise<FileTypeResult> {
+		const mimeType = mime.lookup(file);
+
+		if (!mimeType) {
+			throw new FileTypeError(`Cannot detect mime type of "${file}"`);
+		}
+
+		return {
+			mime: mimeType as MimeType,
+			ext: path.extname(file).slice(1) as FileExtension,
+		};
 	}
 }

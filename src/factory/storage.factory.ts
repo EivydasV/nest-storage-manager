@@ -1,3 +1,4 @@
+import { FileEncryptor } from '../encryptor/file.encryptor';
 import { StorageEnum } from '../enum';
 import { FsHelper } from '../helper';
 import {
@@ -5,6 +6,7 @@ import {
 	StorageOptionsLocalInterface,
 } from '../interface';
 import { StorageProvidersType } from '../interface';
+import { TempFileManager } from '../manager';
 import { AbstractStorage } from '../storage';
 import { LocalStorage } from '../storage';
 import { AwsS3Storage } from '../storage';
@@ -18,6 +20,8 @@ export class StorageFactory {
 				return new LocalStorage(
 					storageModuleOption as StorageOptionsLocalInterface,
 					new FsHelper(),
+					new FileEncryptor(),
+					new TempFileManager(),
 				);
 			case StorageEnum.AWS_S3:
 				return new AwsS3Storage(storageModuleOption as AwsS3StorageInterface);

@@ -9,3 +9,5 @@ export * from './interface';
 export * from './manager';
 export * from './transfer';
 export * from './util';
+export * from './constant';
+export * from './encryption-strategy';

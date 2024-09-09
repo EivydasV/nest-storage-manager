@@ -1,6 +1,10 @@
+import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { Readable, Writable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
+import { Chacha20Poly1305EncryptionStrategy } from '../encryption-strategy';
+import { FileEncryptor } from '../encryptor/file.encryptor';
 import { FileManagerError, InvalidPathError } from '../error';
 import { FsHelper } from '../helper';
 import {
@@ -17,7 +21,8 @@ import {
 	UploadFileLocalOptionsInterface,
 	UploadFileLocalReturnInterface,
 } from '../interface';
-import { FileType } from '../type';
+import { TempFileManager } from '../manager';
+import { EncryptionAlgorithm, FileType } from '../type';
 import { AbstractStorage } from './abstract.storage';
 
 export class LocalStorage extends AbstractStorage {
@@ -30,8 +35,20 @@ export class LocalStorage extends AbstractStorage {
 	constructor(
 		private readonly localStorageOptions: StorageOptionsLocalInterface,
 		private readonly fsHelper: FsHelper,
+		private readonly fileEncryptor: FileEncryptor,
+		private readonly tempFileManager: TempFileManager,
 	) {
 		super(localStorageOptions);
+
+		this.setEncryptionStrategy(
+			this.localStorageOptions.options.encryptionAlgorithm,
+		);
+	}
+
+	private setEncryptionStrategy(strategy?: EncryptionAlgorithm) {
+		if (strategy === 'chacha20-poly1305') {
+			this.fileEncryptor.setStrategy(new Chacha20Poly1305EncryptionStrategy());
+		}
 	}
 
 	public get options(): StorageLocalOptionsType {
@@ -231,16 +248,49 @@ export class LocalStorage extends AbstractStorage {
 	 */
 	public async getFile(
 		key: string,
-		options?: GetFileStreamLocalOptionsInterface,
+		options: GetFileStreamLocalOptionsInterface = {},
 	): Promise<GetFileLocalReturnInterface> {
 		const safePath = this.getSafePath(key);
 		await this.fsHelper.checkIfFileExists(safePath);
 
 		const fileWithType = await this.internalGetFileStats(safePath);
 
+		const fileStream: Readable = this.createReadStream(safePath, options);
+
+		if (this.fileEncryptor.isEncryptionEnabled()) {
+			const encryptionData = this.createReadStream(safePath, {
+				start: this.fileEncryptor.encryptionVitalsStart(fileWithType.stat.size),
+			});
+
+			const { authTag, iv, encryptionTag } =
+				await this.fileEncryptor.getEncryptionVitals(encryptionData);
+
+			if (this.fileEncryptor.isEncrypted(encryptionTag)) {
+				const fileEnd = this.fileEncryptor.encryptedFileEnd(
+					fileWithType.stat.size,
+				);
+				const decrypt = this.fileEncryptor.createDecryption(iv, authTag);
+				const fileDecrypt = this.createReadStream(safePath, {
+					end: fileEnd,
+				});
+				// const { filePath, writeStream } =
+				// 	await this.tempFileManager.createTempFileWriteStream(key);
+				//
+				// try {
+				// 	await pipeline(fileDecrypt, decrypt, writeStream);
+				// } catch (err) {
+				// 	await this.tempFileManager.removeTempFile(filePath);
+				//
+				// 	throw err;
+				// }
+				//
+				// fileStream = this.tempFileManager.createTempFileReadStream(filePath);
+			}
+		}
+
 		return {
 			...fileWithType,
-			stream: this.createReadStream(safePath, options),
+			stream: fileStream,
 		};
 	}
 
@@ -263,15 +313,42 @@ export class LocalStorage extends AbstractStorage {
 				await this.fsHelper.delete(filePath).catch(() => {});
 			}
 
-			throw new FileManagerError(err);
+			throw err;
 		}
 	}
 
 	private async writeSteam(file: FileType, filePath: string): Promise<string> {
-		await pipeline(
-			await this.getReadStream(file),
-			fs.createWriteStream(filePath),
-		);
+		const streams: (Readable | Writable)[] = [this.getReadStream(file)];
+
+		let cipher: crypto.CipherGCM | null = null;
+		let iv: Buffer | null = null;
+		if (this.fileEncryptor.isEncryptionEnabled()) {
+			const { iv: newIv, cipher: newCipher } =
+				this.fileEncryptor.createEncryption();
+
+			iv = newIv;
+			cipher = newCipher;
+			streams.push(cipher);
+		}
+
+		streams.push(this.createWriteStream(filePath));
+
+		await pipeline(streams);
+
+		if (this.fileEncryptor.isEncryptionEnabled()) {
+			if (!cipher || !iv) {
+				throw new Error('Cipher is missing or iv is missing');
+			}
+			console.log('auth', cipher.getAuthTag().toString('hex'));
+			console.log('iv', iv.toString('hex'));
+
+			const createReadStream = this.createWriteStream(filePath, { flags: 'a' });
+			await this.fileEncryptor.appendEncryptionVitals(
+				createReadStream,
+				cipher.getAuthTag(),
+				iv,
+			);
+		}
 
 		return filePath;
 	}
@@ -294,21 +371,18 @@ export class LocalStorage extends AbstractStorage {
 		absoluteFilePath: string,
 		options?: GetFileStatsLocalOptionsType,
 	): Promise<GetFileStatsLocalReturnInterface> {
-		const statPromise = this.fsHelper.stats(absoluteFilePath, options);
-		const fileWithFileTypePromise = this.getFileType(absoluteFilePath);
+		const statPromise = await this.fsHelper.stats(absoluteFilePath, options);
+		const fileTypePromise = await this.getFileTypeFromPath(absoluteFilePath);
 
-		const [stat, fileWithFileType] = await Promise.all([
-			statPromise,
-			fileWithFileTypePromise,
-		]);
+		const [stat, fileType] = await Promise.all([statPromise, fileTypePromise]);
 
 		return {
 			bucket: this.options.bucket,
 			fileName: path.basename(absoluteFilePath),
 			absolutePath: absoluteFilePath,
 			key: this.getRelativePath(absoluteFilePath),
-			mimeType: fileWithFileType.fileType.mime,
-			fileExtension: fileWithFileType.fileType.ext,
+			mimeType: fileType.mime,
+			fileExtension: fileType.ext,
 			stat,
 		};
 	}

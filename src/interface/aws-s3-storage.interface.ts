@@ -9,6 +9,7 @@ import {
 import { Options } from '@aws-sdk/lib-storage';
 import { DeepOmit } from 'ts-essentials';
 import { StorageEnum } from '../enum';
+import { UploadFileOptionsInterface } from './abstract-storage.interface';
 import { UploadFileLocalOptionsInterface } from './local-storage.interface';
 import { BaseStorageOptionsInterface } from './storage-module-options.interface';
 
@@ -22,22 +23,23 @@ export interface AwsS3StorageInterface
 	options: AwsS3StorageOptionsType;
 }
 
-export type S3UploadOptionsType = DeepOmit<
-	Options,
-	{
-		client: never;
-		params: {
-			Bucket: never;
-			Key: never;
-			Body: never;
-		};
-	}
+export type S3UploadOptionsType = Partial<
+	DeepOmit<
+		Options,
+		{
+			client: never;
+			params: {
+				Bucket: never;
+				Key: never;
+				Body: never;
+			};
+		}
+	>
 >;
 
 export interface UploadS3FileOptionsInterface
-	extends Omit<UploadFileLocalOptionsInterface, 'deleteFileOnError'> {
-	cloud?: S3UploadOptionsType;
-}
+	extends UploadFileOptionsInterface,
+		S3UploadOptionsType {}
 
 export type DeleteS3OptionsType = Omit<S3UploadOptionsType, 'Bucket' | 'Key'>;
 

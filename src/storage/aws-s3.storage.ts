@@ -95,7 +95,7 @@ export class AwsS3Storage extends AbstractStorage {
 		fileType: FileTypeResult,
 		fullPath: string,
 	): Promise<Upload> {
-		const stream = await this.getReadStream(file);
+		const stream = this.getReadStream(file);
 
 		return new Upload({
 			client: this.s3Client,
